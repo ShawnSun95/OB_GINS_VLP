@@ -1,0 +1,70 @@
+# OB_GINS: Optimization-Based GNSS/INS Integrated Navigation System
+
+# integration scheme
+scheme: 2 # 1: loose 2: tight
+imu_type: 3 # 1: dji_imu 2: openlog 3: i300
+
+# 数据文件
+# Data files
+imufile: "dataset/1203/20221203_190110_imu.txt"
+vlpfile: "dataset/1203/VLP_2022123_190105.txt"
+#vlpfile: "dataset/1203/ground_truth_2022123_190105.txt"
+outputpath: "dataset/1203/"
+
+# 时间信息, s
+# Processing time parameters
+windows: 10
+starttime: 1670065272
+endtime: 1670065331
+
+# 初始化信息
+# Initialization parameters
+initcoordinate: [30.52963352, 114.35024305,  39.4609]
+initpos: [1.6, 1.6,  0.31] # bug, should be NED, not NEU
+initvel: [ 0, 0, 0 ]   # 北东地速度 (NED velocity), m/s
+initatt: [ 0, 0, 90 ] # 横滚俯仰航向 (RPY attitude), deg
+
+# IMU初始误差
+# IMU constant biases
+initgb: [-100.8672, -107.4228, 0]  # 初始陀螺零偏 (gyroscope biases), deg/hr
+initab: [ 0 ,0 , 0]  # 初始加表零偏 (accelerometer biases), mGal
+
+# IMU原始数据频率, Hz
+# IMU data rate
+imudatarate: 200
+
+# 安装参数
+# Installation parameters
+antlever: [ 0, 0, 0 ]  # 天线杆臂 (antenna lever), IMU前右下方向, m
+odolever: [ 0, 0, 0 ]  # 里程计杆臂 (odometer lever), IMU前右下方向, m
+bodyangle: [ 0.32, -1.64, 180 ]       # IMU到载体的旋转角 (mouting angles to construct C_b^v), deg
+
+odometer:
+    isuseodo: false             # use odometer
+
+    std: [ 0.05, 0.05, 0.05 ]   # 里程标准差 (vehicle velocity standard deviation), m/s
+    srw: 100                    # 比例因子误差 (odometer scale-factor standard deviation), PPM
+
+# IMU噪声建模参数
+# IMU noise parameters
+imumodel:
+    arw: 0.25     # deg/sqrt(hr)
+    vrw: 0.03    # m/s/sqrt(hr)
+    gbstd: 5   # deg/hr
+    abstd: 30   # mGal
+    corrtime: 1.0 # hr
+    
+# vlp parameters
+emission_power: [260.3664, 292.3724, 203.2128, 247.6656, 229.1224]
+lamber_coef: [0.7,0.9,0.9,1,1]
+
+# vlp仿真中断配置
+# vlp outage parameters
+isuseoutage: false
+outagetime: 0
+outagelen: 60
+outageperiod: 180
+
+# 固定阈值GNSS抗差 (m)
+# a fixed threshold for VLP outlier-culling using positioning standard deviation
+vlpthreshold: 20
