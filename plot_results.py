@@ -1,9 +1,10 @@
 #!/usr/bin/python
 #
 # Plots the results from the 3D pose graph optimization. It will draw a line
-# between consecutive vertices.  The commandline expects two optional filenames:
+# between consecutive vertices.  The commandline expects three optional filenames:
 #
 #   ./plot_results.py --initial_poses optional --optimized_poses optional --ground_truth optional
+# The positioning error of "optimized_poses" will be evaluated based on the "ground_truth" file.
 
 
 import matplotlib.pyplot as plot
