@@ -13,36 +13,34 @@ Loosely coupled and tightly coupled integration are both realized. We recommend 
 We recommend you use Ubuntu 18.04 or Ubuntu 20.04 with the newest compiler (gcc>=8.0).
 
 ```shell
-# Ubuntu 18.04
+# Ubuntu 18.04 or 20.04
 
 # gcc-8
 sudo apt install gcc-8 g++-8
 ```
 
-### 1.2 Ceres
+### 1.2 GTest (needed for new version of abseil-cpp)
 
-Follow [Ceres installation instructions](http://ceres-solver.org/installation.html). The version should be lower than 2.2.0.
+```shell
+sudo apt-get install libgtest-dev libgmock-dev
+```
 
 ### 1.3 abseil-cpp
 
-Follow [abseil-cpp installation instructions](https://abseil.io/docs/cpp/quickstart-cmake.html). Don't forget to `sudo make install`.
+Follow [abseil-cpp installation instructions](https://abseil.io/docs/cpp/quickstart-cmake.html).
 
-### 1.4 Eigen3
+Don't forget to `sudo make install` after compiling.
 
-```shell
-sudo apt install libeigen3-dev
-```
+### 1.4 Ceres
+
+Follow [Ceres installation instructions](http://ceres-solver.org/installation.html). 
+
+The version should be lower than 2.2.0. For example, [2.1.0](http://ceres-solver.org/ceres-solver-2.1.0.tar.gz).
 
 ### 1.5 yaml-cpp
 
 ```shell
 sudo apt install libyaml-cpp-dev
-```
-
-### 1.6 GTest (needed for new version of abseil-cpp)
-
-```shell
-sudo apt-get install libgtest-dev libgmock-dev
 ```
 
 ## 2 Build OB_GINS_VLP and run demo
@@ -51,7 +49,7 @@ Once the prerequisites have been installed, you can clone this repository and bu
 
 ```shell
 # Clone the repository
-git clone https://github.com/ShawnSun95/OB_GINS_VLP.git
+git clone git@github.com:ShawnSun95/OB_GINS_VLP.git
 
 # Build OB_GINS
 cd OB_GINS_VLP

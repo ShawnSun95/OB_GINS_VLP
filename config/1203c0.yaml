@@ -1,4 +1,4 @@
-# OB_GINS: Optimization-Based GNSS/INS Integrated Navigation System
+# OB_GINS_VLP: Optimization-Based VLP/INS Integrated Navigation System
 
 # integration scheme
 scheme: 2 # 1: loose 2: tight
@@ -66,6 +66,6 @@ outagetime: 0
 outagelen: 60
 outageperiod: 180
 
-# 固定阈值GNSS抗差 (m)
+# 固定阈值VLP抗差 (m)
 # a fixed threshold for VLP outlier-culling using positioning standard deviation
 vlpthreshold: 20
