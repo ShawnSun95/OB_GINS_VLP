@@ -54,7 +54,7 @@ Once the prerequisites have been installed, you can clone this repository and bu
 git clone https://github.com/ShawnSun95/OB_GINS_VLP.git
 
 # Build OB_GINS
-cd ~/OB_GINS_VLP
+cd OB_GINS_VLP
 mkdir build && cd build
 
 # gcc
@@ -63,7 +63,7 @@ cmake ../ -DCMAKE_BUILD_TYPE=Release
 make -j4
 
 # Run demo dataset
-cd ~/OB_GINS_VLP
+cd ..
 ./bin/ob_gins_vlp ./config/1203c0.yaml
 
 # Wait until the program finish
@@ -76,3 +76,16 @@ We provide a program to plot the navigation results and evaluate the accuracy ba
 ```shell
 python3 ./plot_results.py --optimized_poses ./dataset/1203/OB_GINS_TXT.nav --ground_truth ./dataset/1203/ground_truth_2022123_190105.txt  --initial_poses ./dataset/1203/temp.nav
 ```
+
+If you use OB_GINS_VLP in an academic work, please cite:
+
+    @article{sun2025sana,
+        title={Tightly coupled VLP/INS integrated navigation by inclination estimation and blockage handling},
+        author={Sun, Xiao and Zhuang, Yuan and Yang, Xiansheng and Huai, Jianzhu and Huang, Tianming and Feng, Daquan},
+        journal={Satellite Navigation},
+        volume={6},
+        number={1},
+        pages={7},
+        year={2025},
+        publisher={Springer}
+    }

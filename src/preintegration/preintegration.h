@@ -2,8 +2,6 @@
 #define PREINTEGRATION_H
 
 #include "preintegration_base.h"
-#include "preintegration_earth.h"
-#include "preintegration_earth_odo.h"
 #include "preintegration_normal.h"
 #include "preintegration_odo.h"
 
@@ -15,8 +13,6 @@ public:
     enum PreintegrationOptions {
         PREINTEGRATION_NORMAL    = 0,
         PREINTEGRATION_ODO       = 1,
-        PREINTEGRATION_EARTH     = 2,
-        PREINTEGRATION_EARTH_ODO = 3,
     };
 
     static PreintegrationOptions getOptions(bool isuseodo) {
@@ -38,10 +34,6 @@ public:
             preintegration = std::make_shared<PreintegrationNormal>(parameters, imu0, state);
         } else if (options == PREINTEGRATION_ODO) {
             preintegration = std::make_shared<PreintegrationOdo>(parameters, imu0, state);
-        } else if (options == PREINTEGRATION_EARTH) {
-            preintegration = std::make_shared<PreintegrationEarth>(parameters, imu0, state);
-        } else if (options == PREINTEGRATION_EARTH_ODO) {
-            preintegration = std::make_shared<PreintegrationEarthOdo>(parameters, imu0, state);
         }
 
         return preintegration;
@@ -56,10 +48,6 @@ public:
             return PreintegrationNormal::stateToData(state);
         } else if (options == PREINTEGRATION_ODO) {
             return PreintegrationOdo::stateToData(state);
-        } else if (options == PREINTEGRATION_EARTH) {
-            return PreintegrationEarth::stateToData(state);
-        } else if (options == PREINTEGRATION_EARTH_ODO) {
-            return PreintegrationEarthOdo::stateToData(state);
         }
         return {};
     }
@@ -69,10 +57,6 @@ public:
             return PreintegrationNormal::stateFromData(data);
         } else if (options == PREINTEGRATION_ODO) {
             return PreintegrationOdo::stateFromData(data);
-        } else if (options == PREINTEGRATION_EARTH) {
-            return PreintegrationEarth::stateFromData(data);
-        } else if (options == PREINTEGRATION_EARTH_ODO) {
-            return PreintegrationEarthOdo::stateFromData(data);
         }
 
         return {};
@@ -84,10 +68,6 @@ public:
             num = PreintegrationNormal::NUM_MIX;
         } else if (options == PREINTEGRATION_ODO) {
             num = PreintegrationOdo::NUM_MIX;
-        } else if (options == PREINTEGRATION_EARTH) {
-            num = PreintegrationEarth::NUM_MIX;
-        } else if (options == PREINTEGRATION_EARTH_ODO) {
-            num = PreintegrationEarthOdo::NUM_MIX;
         }
         return num;
     }

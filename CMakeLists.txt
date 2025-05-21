@@ -19,9 +19,7 @@ file(GLOB_RECURSE SOURCE
         src/fileio/filesaver.cc
         src/preintegration/preintegration_base.cc
         src/preintegration/preintegration_normal.cc
-        src/preintegration/preintegration_earth.cc
-        src/preintegration/preintegration_odo.cc
-        src/preintegration/preintegration_earth_odo.cc)
+        src/preintegration/preintegration_odo.cc)
 
 include_directories(${PROJECT_SOURCE_DIR})
 add_executable(${PROJECT_NAME} ${SOURCE})
