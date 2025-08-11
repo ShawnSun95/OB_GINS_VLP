@@ -3,3 +3,5 @@ Release/
 .idea/
 bin/
 build/
+config/
+dataset/

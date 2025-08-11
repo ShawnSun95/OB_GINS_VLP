@@ -1,9 +1,15 @@
+/*
+ * RSS correction methods have been added.
+ * Created by Xiao Sun, Kun Zuo, 2025.06.
+ */
+
 #include "preintegration_base.h"
 
 PreintegrationBase::PreintegrationBase(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0,
-                                       IntegrationState state)
+                                       IntegrationState state,std::shared_ptr<imu_vlp>vlp_1)
     : parameters_(std::move(parameters))
-    , current_state_(std::move(state)) {
+    , current_state_(std::move(state)) 
+    , vlp_(std::move(vlp_1)){
 
     start_time_ = imu0.time;
     end_time_   = imu0.time;
@@ -45,6 +51,46 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
     // 姿态
     delta_state_.q *= Rotation::rotvec2quaternion(dtheta);
     delta_state_.q.normalize();
+
+    //将vlp数据传递进入函数
+    std::vector<double>LED=vlp_->LED;
+    int Nled=vlp_->NLed;
+    int T=vlp_->windows;
+    std::vector<double>M=vlp_->M;
+    int hz=vlp_->hz;
+
+    double ti=current_state_.time-vlp_->start_time;
+    double tk=ti;
+
+    for (int i = 0; i < Nled; i++){ 
+    //计算每一时刻改正量
+        Vector3d unit(0, 0, -1);
+        Vector3d n_PD = current_state_.q.toRotationMatrix() * unit;
+        Vector3d n_LED{0, 0, -1};
+        
+        Vector3d D{LED[i*3+1]-current_state_.p(0),LED[i*3+0]-current_state_.p(1),-LED[i*3+2]-current_state_.p(2)};
+        
+        Vector3d coef1=D.cross(n_LED)/D.dot(n_LED);
+        Vector3d coef2 = (-n_PD / n_PD.dot(D)).eval()
+                - (M[i] * n_LED / n_LED.dot(D)).eval()
+                + ((3 + M[i]) / D.squaredNorm()) * D;
+
+        double dp1=0.0;double dp2=0.0;
+        //计算一段时间的前半段，观测值为向下取整
+        //判断时刻
+        if(ti>=floor(ti) && ti<=floor(ti)+T/2.0){
+            tk=floor(ti);
+            dp1=(ti-tk)*coef1.dot(dtheta)/hz/T;
+            dp1=dp1+(ti-tk)*coef2.dot(current_state_.v)/hz/T;
+            dRSS_first[i]-=dp1;
+        } else {
+            tk=ceil(ti);
+            //时间段的后半段
+            dp2=-(tk-ti)*coef1.dot(dtheta)/hz/T;
+            dp2=dp2-(tk-ti)*coef2.dot(current_state_.v)/hz/T;
+            dRSS_latter[i]-=dp2;
+        }
+    }
 }
 
 void PreintegrationBase::addNewImu(const IMU &imu) {

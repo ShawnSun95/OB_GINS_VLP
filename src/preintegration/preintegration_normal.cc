@@ -3,8 +3,8 @@
 #include "src/common/logging.h"
 
 PreintegrationNormal::PreintegrationNormal(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0,
-                                           IntegrationState state)
-    : PreintegrationBase(std::move(parameters), imu0, std::move(state)) {
+                                           IntegrationState state,std::shared_ptr<imu_vlp>vlp_1)
+    : PreintegrationBase(std::move(parameters), imu0, std::move(state),std::move(vlp_1)) {
 
     // Reset state
     resetState(state, NUM_STATE);

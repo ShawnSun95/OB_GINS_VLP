@@ -27,13 +27,13 @@ public:
 
     static std::shared_ptr<PreintegrationBase>
         createPreintegration(const std::shared_ptr<IntegrationParameters> &parameters, const IMU &imu0,
-                             const IntegrationState &state, PreintegrationOptions options) {
+                             const IntegrationState &state, PreintegrationOptions options,std::shared_ptr<imu_vlp>vlp_1) {
         std::shared_ptr<PreintegrationBase> preintegration;
 
         if (options == PREINTEGRATION_NORMAL) {
-            preintegration = std::make_shared<PreintegrationNormal>(parameters, imu0, state);
+            preintegration = std::make_shared<PreintegrationNormal>(parameters, imu0, state,vlp_1);
         } else if (options == PREINTEGRATION_ODO) {
-            preintegration = std::make_shared<PreintegrationOdo>(parameters, imu0, state);
+            preintegration = std::make_shared<PreintegrationOdo>(parameters, imu0, state,vlp_1);
         }
 
         return preintegration;

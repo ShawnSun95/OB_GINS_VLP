@@ -5,14 +5,13 @@
 #include "src/common/types.h"
 
 #include "integration_state.h"
-
 #include <memory>
 #include <vector>
 
 class PreintegrationBase {
 
 public:
-    PreintegrationBase(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state);
+    PreintegrationBase(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state,std::shared_ptr<imu_vlp>vlp_1);
 
     virtual ~PreintegrationBase() = default;
 
@@ -42,6 +41,14 @@ public:
 
     const vector<IMU> &imuBuffer() {
         return imu_buffer_;
+    }
+
+    double* RSS_corrrection1() {
+        return dRSS_first;
+    }
+    
+    double* RSS_corrrection2() {
+        return dRSS_latter;
     }
 
     void addNewImu(const IMU &imu);
@@ -108,6 +115,10 @@ protected:
     double delta_time_{0};
     double start_time_;
     double end_time_;
+
+    std::shared_ptr<imu_vlp> vlp_;
+    double dRSS_first[20];
+    double dRSS_latter[20];
 
     Vector3d gravity_;
 

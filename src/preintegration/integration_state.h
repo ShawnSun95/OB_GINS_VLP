@@ -66,4 +66,16 @@ typedef struct IntegrationParameters {
     Vector3d station; // 站心坐标系原点
 } IntegrationParameters;
 
+//用于将vlp数据传入imu中
+typedef struct imu_vlp{
+    std::vector<double>LED;
+    std::vector<double> M;
+    int NLed;
+    int windows;
+    double start_time;
+    int hz;
+    //定义储存改正值的二维数组
+    std::vector<std::vector<double>>RSS_resi_1;
+} imu_vlp;
+
 #endif // INTEGRATION_DEFINE_H

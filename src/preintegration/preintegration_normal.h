@@ -6,7 +6,7 @@
 class PreintegrationNormal : public PreintegrationBase {
 
 public:
-    PreintegrationNormal(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state);
+    PreintegrationNormal(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state,std::shared_ptr<imu_vlp> vlp_1);
 
     Eigen::MatrixXd evaluate(const IntegrationState &state0, const IntegrationState &state1,
                              double *residuals) override;
@@ -47,6 +47,7 @@ public:
 private:
     static constexpr int NUM_STATE = 15;
     static constexpr int NUM_NOISE = 12;
+    VLP vlp0;
 };
 
 #endif // PREINTEGRATION_NORMAL_H

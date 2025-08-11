@@ -6,7 +6,7 @@
 class PreintegrationOdo : public PreintegrationBase {
 
 public:
-    PreintegrationOdo(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state);
+    PreintegrationOdo(std::shared_ptr<IntegrationParameters> parameters, const IMU &imu0, IntegrationState state,std::shared_ptr<imu_vlp>vlp_1);
 
     Eigen::MatrixXd evaluate(const IntegrationState &state0, const IntegrationState &state1,
                              double *residuals) override;

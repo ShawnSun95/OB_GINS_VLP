@@ -3,7 +3,7 @@
  *
  * Copyright (C) 2024 Wuhan University
  *
- *     Author : xiao Sun
+ *     Author : Xiao Sun
  *    Contact : xsun@whu.edu.cn
  *
  * This program is free software: you can redistribute it and/or modify
@@ -187,15 +187,15 @@ int main(int argc, char *argv[]) {
     // 数据文件调整
     // data alignment
     IMU imu_cur, imu_pre;
-    do {
+    while (imu_cur.time < starttime) {
         imu_pre = imu_cur;
         imu_cur = imufile.next(parameters->gravity);
-    } while (imu_cur.time < starttime);
+    }
 
     VLP vlp;
-    do {
+    while (vlp.time < starttime) {
         vlp = vlpfile.next();
-    } while (vlp.time < starttime);
+    }
 
     // 初始位置, 求相对
     if(scheme == 2){
@@ -228,15 +228,24 @@ int main(int argc, char *argv[]) {
 
     statelist[0]     = state_curr;
     statedatalist[0] = Preintegration::stateToData(state_curr, preintegration_options);
-    vlplist.push_back(vlp);
+    // vlplist.push_back(vlp);
 
     double sow = round(vlp.time);
     timelist.push_back(sow);
 
     // 初始预积分
     // Initial preintegration
+    //将vlp的相关数据输入预积分过程
+    auto vlp_1=std::make_shared<imu_vlp>();
+    vlp_1->LED=LED;
+    vlp_1->NLed=Nled;
+    vlp_1->windows=INTEGRATION_LENGTH;
+    vlp_1->start_time=starttime;
+    vlp_1->M=M;
+    vlp_1->hz=imudatarate;
+
     preintegrationlist.emplace_back(
-        Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options));
+        Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options,vlp_1));
 
     // 读取下一个整秒vlp
     vlp = vlpfile.next();
@@ -303,6 +312,16 @@ int main(int argc, char *argv[]) {
                 if (vlpfile.isEOF()) {
                     vlp.time = 0;
                 }
+                
+                // RSS correction
+                for (int i=0; i<Nled; i++) {
+                    vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection1()[i] * vlp.RSS[i];
+                    vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
+                    // if (preintegrationlist.size() > 1) {
+                    //     vlp.RSS[i] += preintegrationlist[preintegrationlist.size() - 2]
+                    //         ->RSS_corrrection2()[i] * vlp.RSS[i];
+                    // }
+                }
             }
 
             // IMU内插处理
@@ -348,10 +367,10 @@ int main(int argc, char *argv[]) {
                     // 位姿
                     ceres::LocalParameterization *parameterization = new (PoseParameterization);
                     problem.AddParameterBlock(statedatalist[k].pose, Preintegration::numPoseParameter(),
-                                              parameterization);
+                                            parameterization);
 
                     problem.AddParameterBlock(statedatalist[k].mix,
-                                              Preintegration::numMixParameter(preintegration_options));
+                                            Preintegration::numMixParameter(preintegration_options));
                 }
 
                 // vlp残差
@@ -387,7 +406,7 @@ int main(int argc, char *argv[]) {
                 for (size_t k = 0; k < preintegrationlist.size(); k++) {
                     auto factor = new PreintegrationFactor(preintegrationlist[k]);
                     problem.AddResidualBlock(factor, nullptr, statedatalist[k].pose, statedatalist[k].mix,
-                                             statedatalist[k + 1].pose, statedatalist[k + 1].mix);
+                                            statedatalist[k + 1].pose, statedatalist[k + 1].mix);
                 }
 
                 // NHC factors
@@ -427,71 +446,6 @@ int main(int argc, char *argv[]) {
             }
 
             if (preintegrationlist.size() == static_cast<size_t>(windows)) {
-/*                 {
-                    // 边缘化
-                    // marginalization
-                    std::shared_ptr<MarginalizationInfo> marginalization_info = std::make_shared<MarginalizationInfo>();
-                    if (last_marginalization_info && last_marginalization_info->isValid()) {
-
-                        std::vector<int> marginilized_index;
-                        for (size_t k = 0; k < last_marginalization_parameter_blocks.size(); k++) {
-                            if (last_marginalization_parameter_blocks[k] == statedatalist[0].pose ||
-                                last_marginalization_parameter_blocks[k] == statedatalist[0].mix) {
-                                marginilized_index.push_back(static_cast<int>(k));
-                            }
-                        }
-
-                        auto factor   = std::make_shared<MarginalizationFactor>(last_marginalization_info);
-                        auto residual = std::make_shared<ResidualBlockInfo>(
-                            factor, nullptr, last_marginalization_parameter_blocks, marginilized_index);
-                        marginalization_info->addResidualBlockInfo(residual);
-                    }
-
-                    // IMU残差
-                    // preintegration factors
-                    {
-                        auto factor   = std::make_shared<PreintegrationFactor>(preintegrationlist[0]);
-                        auto residual = std::make_shared<ResidualBlockInfo>(
-                            factor, nullptr,
-                            std::vector<double *>{statedatalist[0].pose, statedatalist[0].mix, statedatalist[1].pose,
-                                                  statedatalist[1].mix},
-                            std::vector<int>{0, 1});
-                        marginalization_info->addResidualBlockInfo(residual);
-                    }
-
-                    // vlp残差
-                    // vlp factors
-                    {
-                        if (fabs(timelist[0] - vlplist[0].time) < MINIMUM_INTERVAL) {
-                            if(scheme == 1) {
-                                auto factor = std::make_shared<VLPFactor>(vlplist[0], antlever);
-                                auto residual = std::make_shared<ResidualBlockInfo>(
-                                    factor, nullptr, std::vector<double *>{statedatalist[0].pose}, std::vector<int>{});
-                                marginalization_info->addResidualBlockInfo(residual);
-                            } else {
-                                auto factor = std::make_shared<VLPFactor2>(vlplist[0], antlever, vlp_power, M);
-                                auto residual = std::make_shared<ResidualBlockInfo>(
-                                    factor, nullptr, std::vector<double *>{statedatalist[0].pose}, std::vector<int>{});
-                                marginalization_info->addResidualBlockInfo(residual);
-                            }
-                        }
-                    }
-
-                    // 边缘化处理
-                    // do marginalization
-                    marginalization_info->marginalization();
-
-                    // 数据指针调整
-                    // get new pointers
-                    std::unordered_map<long, double *> address;
-                    for (size_t k = 1; k <= preintegrationlist.size(); k++) {
-                        address[reinterpret_cast<long>(statedatalist[k].pose)] = statedatalist[k - 1].pose;
-                        address[reinterpret_cast<long>(statedatalist[k].mix)]  = statedatalist[k - 1].mix;
-                    }
-                    last_marginalization_parameter_blocks = marginalization_info->getParamterBlocks(address);
-                    last_marginalization_info             = std::move(marginalization_info);
-                } */
-
                 // 滑窗处理
                 // sliding window
                 {
@@ -519,7 +473,7 @@ int main(int argc, char *argv[]) {
             // 新建立新的预积分
             // build a new preintegration object
             preintegrationlist.emplace_back(
-                Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options));
+                Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options, vlp_1));
         } else {
             auto integration = *preintegrationlist.rbegin();
             writeNavResult(integration->endTime()-starttime, integration->currentState(), navfile, errfile);
