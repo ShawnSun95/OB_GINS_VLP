@@ -30,7 +30,6 @@
 #include "src/factors/vlp_factor.h"
 #include "src/factors/vlp_factor2.h"
 #include "src/factors/NHC_factor.h"
-#include "src/factors/marginalization_factor.h"
 #include "src/factors/pose_parameterization.h"
 #include "src/preintegration/imu_error_factor.h"
 #include "src/preintegration/preintegration.h"
@@ -117,6 +116,11 @@ int main(int argc, char *argv[]) {
         INS_only= config["INS_only"].as<bool>();
     } catch (YAML::Exception &exception) { }
 
+    bool isNHC = true;
+    try {
+        isNHC= config["is_NHC"].as<bool>();
+    } catch (YAML::Exception &exception) { }
+
     // 安装参数
     // installation parameters
     vec = config["antlever"].as<std::vector<double>>();
@@ -128,6 +132,10 @@ int main(int argc, char *argv[]) {
     bodyangle *= D2R;
 
     int Nled = 5;
+    bool vlp_corr = false;
+    try {
+        vlp_corr = config["vlp_corr"].as<bool>();
+    } catch (YAML::Exception &exception) { }
     std::vector<double>vlp_power = config["emission_power"].as<std::vector<double>>();
     std::vector<double>M={1,1,1,1,1};
     std::vector<double>err={0.05,0.05,0.05};
@@ -187,15 +195,15 @@ int main(int argc, char *argv[]) {
     // 数据文件调整
     // data alignment
     IMU imu_cur, imu_pre;
-    while (imu_cur.time < starttime) {
+    do {
         imu_pre = imu_cur;
         imu_cur = imufile.next(parameters->gravity);
-    }
+    } while (imu_cur.time < starttime);
 
     VLP vlp;
-    while (vlp.time < starttime) {
+    do {
         vlp = vlpfile.next();
-    }
+    } while (vlp.time < starttime);
 
     // 初始位置, 求相对
     if(scheme == 2){
@@ -228,7 +236,7 @@ int main(int argc, char *argv[]) {
 
     statelist[0]     = state_curr;
     statedatalist[0] = Preintegration::stateToData(state_curr, preintegration_options);
-    // vlplist.push_back(vlp);
+    vlplist.push_back(vlp);
 
     double sow = round(vlp.time);
     timelist.push_back(sow);
@@ -249,10 +257,6 @@ int main(int argc, char *argv[]) {
 
     // 读取下一个整秒vlp
     vlp = vlpfile.next();
-
-    // 边缘化信息
-    std::shared_ptr<MarginalizationInfo> last_marginalization_info;
-    std::vector<double *> last_marginalization_parameter_blocks;
 
     // 下一个积分节点
     sow += INTEGRATION_LENGTH;
@@ -289,6 +293,15 @@ int main(int argc, char *argv[]) {
             // 当前IMU数据时间等于vlp数据时间, 读取新的vlp
             // add vlp and read new vlp
             if (fabs(vlp.time - sow) < MINIMUM_INTERVAL) {
+                // RSS correction, start from the second obs
+                for (int i = 0; i < Nled; i++) { 
+                    if(preintegrationlist.size() > 1 && vlp_corr == true){
+                        vlplist.back().RSS[i] += preintegrationlist.back()->RSS_corrrection1()[i] * vlplist.back().RSS[i];
+                        vlplist.back().RSS[i] += preintegrationlist[preintegrationlist.size()-2]
+                            ->RSS_corrrection2()[i] * vlplist.back().RSS[i];
+                    }
+                }
+                
                 vlplist.push_back(vlp);
 
                 vlp = vlpfile.next();
@@ -311,16 +324,6 @@ int main(int argc, char *argv[]) {
 
                 if (vlpfile.isEOF()) {
                     vlp.time = 0;
-                }
-                
-                // RSS correction
-                for (int i=0; i<Nled; i++) {
-                    vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection1()[i] * vlp.RSS[i];
-                    vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
-                    // if (preintegrationlist.size() > 1) {
-                    //     vlp.RSS[i] += preintegrationlist[preintegrationlist.size() - 2]
-                    //         ->RSS_corrrection2()[i] * vlp.RSS[i];
-                    // }
                 }
             }
 
@@ -409,10 +412,11 @@ int main(int argc, char *argv[]) {
                                             statedatalist[k + 1].pose, statedatalist[k + 1].mix);
                 }
 
-                // NHC factors
-                for (size_t k = 0; k <= preintegrationlist.size(); k++) {
-                    auto factor = new NHCFactor(antlever);
-                    problem.AddResidualBlock(factor, nullptr, statedatalist[k].pose, statedatalist[k].mix);
+                if (isNHC){
+                    for (size_t k = 0; k <= preintegrationlist.size(); k++) {
+                        auto factor = new NHCFactor(antlever);
+                        problem.AddResidualBlock(factor, nullptr, statedatalist[k].pose, statedatalist[k].mix);
+                    }
                 }
 
                 {
@@ -421,13 +425,6 @@ int main(int argc, char *argv[]) {
                     auto factor = new ImuErrorFactor(*preintegrationlist.rbegin());
                     problem.AddResidualBlock(factor, nullptr, statedatalist[preintegrationlist.size()].mix);
                 }
-
-                // 边缘化残差
-                // prior factor
-/*                 if (last_marginalization_info && last_marginalization_info->isValid()) {
-                    auto factor = new MarginalizationFactor(last_marginalization_info);
-                    problem.AddResidualBlock(factor, nullptr, last_marginalization_parameter_blocks);
-                } */
 
                 // 求解最小二乘
                 // solve the Least-Squares problem

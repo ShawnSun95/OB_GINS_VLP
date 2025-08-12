@@ -18,6 +18,9 @@ PreintegrationBase::PreintegrationBase(std::shared_ptr<IntegrationParameters> pa
     imu_buffer_.push_back(imu0);
 
     gravity_ = Vector3d(0, 0, parameters_->gravity);
+
+    dRSS_first.assign(vlp_->NLed, 0.0);
+    dRSS_latter.assign(vlp_->NLed, 0.0);
 }
 
 void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {

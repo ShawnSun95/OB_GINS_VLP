@@ -43,11 +43,11 @@ public:
         return imu_buffer_;
     }
 
-    double* RSS_corrrection1() {
+    std::vector<double> RSS_corrrection1() {
         return dRSS_first;
     }
     
-    double* RSS_corrrection2() {
+    std::vector<double> RSS_corrrection2() {
         return dRSS_latter;
     }
 
@@ -117,8 +117,8 @@ protected:
     double end_time_;
 
     std::shared_ptr<imu_vlp> vlp_;
-    double dRSS_first[20];
-    double dRSS_latter[20];
+    std::vector<double> dRSS_first;  // 动态内存，自动管理
+    std::vector<double> dRSS_latter;  // 动态内存，自动管理
 
     Vector3d gravity_;
 
