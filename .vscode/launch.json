@@ -6,7 +6,7 @@
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/bin/ob_gins_vlp",
-            "args": ["${workspaceFolder}/config/simu.yaml"],
+            "args": ["${workspaceFolder}/config/1203c0.yaml"],
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],

@@ -262,6 +262,7 @@ int main(int argc, char *argv[]) {
 
     // 下一个积分节点
     sow += INTEGRATION_LENGTH;
+    int count4RSS = 0; // 用于RSS修正的IMU数量
 
     // Pure INS mechanization
     while (INS_only) {
@@ -286,11 +287,11 @@ int main(int argc, char *argv[]) {
 
         // 加入IMU数据
         // Add new imu data to preintegration
-        int count = round((imu_pre.time - floor(imu_pre.time/INTEGRATION_LENGTH)) * imudatarate);
-        if (count < imudatarate/2 && imu_cur.time > starttime + INTEGRATION_LENGTH){
-            imu_pre = imulist[imulist.size()+count-1-imudatarate/2];
-            imu_cur = imulist[imulist.size()+count-imudatarate/2];
-            preintegrationlist.back()->addNewImu(imu_cur);
+        if (count4RSS > 0 && imu_cur.time > starttime + INTEGRATION_LENGTH){
+            imu_pre = imulist[imulist.size()-count4RSS-1];
+            preintegrationlist.back()->addNewImu(imu_pre);
+            imu_cur = imulist[imulist.size()-count4RSS];
+            count4RSS--;
         } else {
             preintegrationlist.back()->addNewImu(imu_cur);
             imu_pre = imu_cur;
@@ -305,10 +306,12 @@ int main(int argc, char *argv[]) {
                 // false preintegration, for RSS correction
                 std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
                     parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
-                for (int i = 0; i < imudatarate/2; i++){
-                    false_pre->addNewImu(imu_cur);
-                    imu_cur = imufile.next(parameters->gravity);
-                    imulist.push_back(imu_cur);
+                IMU imu_temp = imu_cur;
+                while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
+                    false_pre->addNewImu(imu_temp);
+                    imu_temp = imufile.next(parameters->gravity);
+                    imulist.push_back(imu_temp);
+                    count4RSS++;
                 }
 
                 // RSS correction, start from the second obs
