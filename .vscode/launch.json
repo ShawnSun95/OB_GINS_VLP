@@ -19,6 +19,17 @@
                     "ignoreFailures": true
                 }
             ]
+        },
+        {
+            "name": "Python: 当前文件",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "cwd": "${workspaceFolder}",
+            "args": ["--optimized_poses", "./dataset/simu/OB_GINS_TXT.nav",
+                "--initial_poses", "./dataset/simu/temp.nav",
+                "--ground_truth", "./dataset/simu/reference.txt"],
         }
     ]
 }
