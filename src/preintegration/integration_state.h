@@ -74,8 +74,6 @@ typedef struct imu_vlp{
     int windows;
     double start_time;
     int hz;
-    //定义储存改正值的二维数组
-    std::vector<std::vector<double>>RSS_resi_1;
 } imu_vlp;
 
 #endif // INTEGRATION_DEFINE_H

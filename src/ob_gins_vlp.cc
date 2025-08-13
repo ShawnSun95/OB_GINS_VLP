@@ -218,6 +218,7 @@ int main(int argc, char *argv[]) {
     std::vector<IntegrationStateData> statedatalist(windows + 1);
     std::vector<VLP> vlplist;
     std::vector<double> timelist;
+    std::vector<IMU> imulist; // store all imu data
 
     Preintegration::PreintegrationOptions preintegration_options = Preintegration::getOptions(isuseodo);
 
@@ -237,6 +238,7 @@ int main(int argc, char *argv[]) {
     statelist[0]     = state_curr;
     statedatalist[0] = Preintegration::stateToData(state_curr, preintegration_options);
     vlplist.push_back(vlp);
+    imulist.push_back(imu_cur);
 
     double sow = round(vlp.time);
     timelist.push_back(sow);
@@ -284,21 +286,36 @@ int main(int argc, char *argv[]) {
 
         // 加入IMU数据
         // Add new imu data to preintegration
-        preintegrationlist.back()->addNewImu(imu_cur);
-
-        imu_pre = imu_cur;
-        imu_cur = imufile.next(parameters->gravity);
+        int count = round((imu_pre.time - floor(imu_pre.time/INTEGRATION_LENGTH)) * imudatarate);
+        if (count < imudatarate/2 && imu_cur.time > starttime + INTEGRATION_LENGTH){
+            imu_pre = imulist[imulist.size()+count-1-imudatarate/2];
+            imu_cur = imulist[imulist.size()+count-imudatarate/2];
+            preintegrationlist.back()->addNewImu(imu_cur);
+        } else {
+            preintegrationlist.back()->addNewImu(imu_cur);
+            imu_pre = imu_cur;
+            imu_cur = imufile.next(parameters->gravity);
+            imulist.push_back(imu_cur);
+        }
 
         if (imu_cur.time > sow) {
             // 当前IMU数据时间等于vlp数据时间, 读取新的vlp
             // add vlp and read new vlp
             if (fabs(vlp.time - sow) < MINIMUM_INTERVAL) {
+                // false preintegration, for RSS correction
+                std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
+                    parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
+                for (int i = 0; i < imudatarate/2; i++){
+                    false_pre->addNewImu(imu_cur);
+                    imu_cur = imufile.next(parameters->gravity);
+                    imulist.push_back(imu_cur);
+                }
+
                 // RSS correction, start from the second obs
                 for (int i = 0; i < Nled; i++) { 
-                    if(preintegrationlist.size() > 1 && vlp_corr == true){
-                        vlplist.back().RSS[i] += preintegrationlist.back()->RSS_corrrection1()[i] * vlplist.back().RSS[i];
-                        vlplist.back().RSS[i] += preintegrationlist[preintegrationlist.size()-2]
-                            ->RSS_corrrection2()[i] * vlplist.back().RSS[i];
+                    if(vlp_corr == true){
+                        vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
+                        vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
                     }
                 }
                 
@@ -336,6 +353,7 @@ int main(int argc, char *argv[]) {
 
                 imu_pre = imu_cur;
                 imu_cur = imufile.next(parameters->gravity);
+                imulist.push_back(imu_cur);
             } else if (isneed == 2) {
                 imuInterpolation(imu_cur, imu_pre, imu_cur, sow);
                 preintegrationlist.back()->addNewImu(imu_pre);
