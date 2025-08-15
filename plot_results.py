@@ -37,30 +37,47 @@ if options.ground_truth != '':
 
   # 提取时间戳
   gt_timestamps = ground_truth[:, 0]
-  opt_timestamps = poses_optimized[:, 0] + gt_timestamps[0]
+  opt_timestamps = poses_optimized[:, 0]
+
+  # 共同的时间窗口
+  gt_start, gt_end = gt_timestamps[0], gt_timestamps[-1]
+  opt_start, opt_end = opt_timestamps[0], opt_timestamps[-1]
+
+  common_start = max(gt_start, opt_start)
+  common_end = min(gt_end, opt_end)
+  if common_start > common_end + 1e-6:
+    raise ValueError(f"No common time slot: GT [{gt_start}, {gt_end}], OPT [{opt_start}, {opt_end}]")
+
+  gt_mask = (gt_timestamps >= common_start - 1e-6) & (gt_timestamps <= common_end + 1e-6)
+  opt_mask = (opt_timestamps >= common_start - 1e-6) & (opt_timestamps <= common_end + 1e-6)
+  gt_indices = np.where(gt_mask)[0]
+  opt_indices = np.where(opt_mask)[0]
+
+  gt_cropped = ground_truth[gt_indices, :]
+  opt_cropped = poses_optimized[opt_indices, :]
 
   # 使用 numpy.searchsorted 找到每个优化位姿时间戳在 ground_truth 中最接近的时间戳的索引
   # 注意：searchsorted 找的是插入位置，我们取左边或右边最近的
-  indices = np.searchsorted(gt_timestamps, opt_timestamps, side='left')
+  indices = np.searchsorted(opt_cropped[:, 0], gt_cropped[:, 0], side='left')
 
   # 处理边界情况
   # 对于每个索引，比较左边和右边（如果存在）哪个时间戳更接近
   distances = []
 
   for i, idx in enumerate(indices):
-    opt_time = opt_timestamps[i]
-    opt_x, opt_y = poses_optimized[i, 1], poses_optimized[i, 2]
+    gt_time = gt_cropped[i, 0]
+    gt_x, gt_y = gt_cropped[i, 1], gt_cropped[i, 2]
     
     # 确定比较的候选索引
     candidates = []
     if idx > 0:
         candidates.append(idx - 1)
-    if idx < len(gt_timestamps):
+    if idx < len(opt_cropped[:, 0]):
         candidates.append(idx)
     
-    # 找到时间戳最接近的 ground truth 行
-    best_idx = min(candidates, key=lambda j: abs(gt_timestamps[j] - opt_time))
-    gt_x, gt_y = ground_truth[best_idx, 1], ground_truth[best_idx, 2]
+    # 找到时间戳最接近的 opt 行
+    best_idx = min(candidates, key=lambda j: abs(opt_cropped[j, 0] - gt_time))
+    opt_x, opt_y = opt_cropped[best_idx, 1], opt_cropped[best_idx, 2]
     
     # 计算欧几里得距离
     distance = np.sqrt((opt_x - gt_x)**2 + (opt_y - gt_y)**2)
@@ -71,7 +88,8 @@ if options.ground_truth != '':
   # 子图 1
   ax1 = fig.add_subplot(4, 1, 1)
   ax1.plot(opt_timestamps, poses_optimized[:, 1], label='Optimized')
-  ax1.plot(gt_timestamps, ground_truth[:, 1], label='Ground Truth')
+  ax1.plot(poses_original[:, 0], poses_original[:, 1], label='Initial')
+  ax1.plot(gt_timestamps, ground_truth[:, 1], '--', label='Ground Truth')
   ax1.set_title('Position X')
   ax1.set_xlabel('Timestamp')
   ax1.set_ylabel('Position (m)')
@@ -80,7 +98,8 @@ if options.ground_truth != '':
   # 子图 2
   ax2 = fig.add_subplot(4, 1, 2)
   ax2.plot(opt_timestamps, poses_optimized[:, 2], label='Optimized')
-  ax2.plot(gt_timestamps, ground_truth[:, 2], label='Ground Truth')
+  ax2.plot(poses_original[:, 0], poses_original[:, 2], label='Initial')
+  ax2.plot(gt_timestamps, ground_truth[:, 2], '--', label='Ground Truth')
   ax2.set_title('Position Y')
   ax2.set_xlabel('Timestamp')
   ax2.set_ylabel('Position (m)')
@@ -89,7 +108,8 @@ if options.ground_truth != '':
   # 子图 3
   ax3 = fig.add_subplot(4, 1, 3)
   ax3.plot(opt_timestamps, poses_optimized[:, 3], label='Optimized')
-  ax3.plot(gt_timestamps, ground_truth[:, 3], label='Ground Truth')
+  ax3.plot(poses_original[:, 0], poses_original[:, 3], label='Initial')
+  ax3.plot(gt_timestamps, ground_truth[:, 3], '--', label='Ground Truth')
   ax3.set_title('Position Z')
   ax3.set_xlabel('Timestamp')
   ax3.set_ylabel('Position (m)')
@@ -97,7 +117,7 @@ if options.ground_truth != '':
 
   # 子图 4
   ax4 = fig.add_subplot(4, 1, 4)
-  ax4.plot(opt_timestamps, distances)
+  ax4.plot(gt_cropped[:, 0], distances)
   ax4.set_title('2D Position Error')
   ax4.set_xlabel('Timestamp')
   ax4.set_ylabel('Distance (m)')

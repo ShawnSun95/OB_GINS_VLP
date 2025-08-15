@@ -72,7 +72,7 @@ cd ..
 We provide a program to plot the navigation results and evaluate the accuracy based on a ground truth positions. You could follow an example:
 
 ```shell
-python3 ./plot_results.py --optimized_poses ./dataset/1203/OB_GINS_TXT.nav --ground_truth ./dataset/1203/ground_truth_2022123_190105.txt  --initial_poses ./dataset/1203/temp.nav
+python3 ./plot_results.py --optimized_poses ./dataset/1203/OB_GINS_TXT.nav --ground_truth ./dataset/1203/ground_truth_2022123_185806.txt  --initial_poses ./dataset/1203/temp.nav
 ```
 
 If you use OB_GINS_VLP in an academic work, please cite:

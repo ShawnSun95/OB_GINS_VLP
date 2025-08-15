@@ -81,7 +81,7 @@ int main(int argc, char *argv[]) {
     vec = config["initcoordinate"].as<std::vector<double>>();
     Vector3d station_origin(vec[0]*D2R,vec[1]*D2R,vec[2]);
     vec = config["initpos"].as<std::vector<double>>();
-    Vector3d initial_pos(vec[0],vec[1],vec[2]);
+    Vector3d initial_pos(vec[0],vec[1],-vec[2]);
     vec = config["initvel"].as<std::vector<double>>();
     Vector3d initvel(vec.data());
     vec = config["initatt"].as<std::vector<double>>();
@@ -486,7 +486,7 @@ int main(int argc, char *argv[]) {
             }
 
             // write result
-            writeNavResult(*timelist.rbegin()-starttime, state_curr, navfile, errfile);
+            writeNavResult(*timelist.rbegin(), state_curr, navfile, errfile);
 
             // 新建立新的预积分
             // build a new preintegration object
@@ -494,7 +494,7 @@ int main(int argc, char *argv[]) {
                 Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options, vlp_1));
         } else {
             auto integration = *preintegrationlist.rbegin();
-            writeNavResult(integration->endTime()-starttime, integration->currentState(), navfile, errfile);
+            writeNavResult(integration->endTime(), integration->currentState(), navfile, errfile);
         }
     }
 

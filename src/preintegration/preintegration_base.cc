@@ -63,7 +63,7 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
     int hz=vlp_->hz;
 
     double ti=current_state_.time-vlp_->start_time;
-    double tk=ti;
+    double tk=floor(ti)+T/2.0;
 
     for (int i = 0; i < Nled; i++){ 
     //计算每一时刻改正量
@@ -79,19 +79,16 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
                 + ((3 + M[i]) / D.squaredNorm()) * D;
 
         double dp1=0.0;double dp2=0.0;
-        //计算一段时间的前半段，观测值为向下取整
         //判断时刻
-        if(ti>=floor(ti) && ti<=floor(ti)+T/2.0){
-            tk=floor(ti);
-            dp1=(ti-tk)*coef1.dot(dtheta)/hz/T;
-            dp1=dp1+(ti-tk)*coef2.dot(current_state_.v)/hz/T;
-            dRSS_first[i]-=dp1;
+        if(ti>=floor(ti) && ti<tk){
+            dp1=(tk-ti)*coef1.dot(dtheta)/hz/T;
+            dp1=dp1+(tk-ti)*coef2.dot(current_state_.v)/hz/T;
+            dRSS_first[i]+=dp1;
         } else {
-            tk=ceil(ti);
             //时间段的后半段
-            dp2=-(tk-ti)*coef1.dot(dtheta)/hz/T;
-            dp2=dp2-(tk-ti)*coef2.dot(current_state_.v)/hz/T;
-            dRSS_latter[i]-=dp2;
+            dp2=-(ti-tk)*coef1.dot(dtheta)/hz/T;
+            dp2=dp2-(ti-tk)*coef2.dot(current_state_.v)/hz/T;
+            dRSS_latter[i]+=dp2;
         }
     }
 }

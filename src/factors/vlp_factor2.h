@@ -66,7 +66,7 @@ public:
                     jacobian(i, 0) = P * (-n_PD[0] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+1] - p(0))/(h * h + s * s));
                     jacobian(i, 1) = P * (-n_PD[1] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+0] - p(1))/(h * h + s * s));
                     jacobian(i, 2) = P * (-n_PD[2] / LOS.dot(n_PD) -M[i]*n_LED[2]/n_LED.dot(LOS) + 
-                        (3 + M[i])*(-LED[i*3+2] + p(2))/(h * h + s * s));
+                        (3 + M[i])*(-LED[i*3+2] - p(2))/(h * h + s * s));
 
                     jacobian.block<1, 3>(i, 3) = -P * LOS.cross(n_PD) / LOS.dot(n_PD);
                     jacobian.block<1, 3>(i, 3) = jacobian.block<1, 3>(i, 3) * q.toRotationMatrix();

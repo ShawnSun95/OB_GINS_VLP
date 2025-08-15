@@ -4,6 +4,7 @@
 scheme: 2 # 1: loose 2: tight
 imu_type: 3 # 1: dji_imu 2: openlog 3: i300
 INS_only: false
+is_NHC: false
 
 # 数据文件
 # Data files

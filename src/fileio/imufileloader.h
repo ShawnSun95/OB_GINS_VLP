@@ -1,6 +1,8 @@
 #ifndef IMUFILELOADER_H
 #define IMUFILELOADER_H
 
+#define MINIMUM_INTERVAL 0.001
+
 #include "fileloader.h"
 #include "src/common/types.h"
 
@@ -84,9 +86,15 @@ public:
             // IMU: NED, incremental; gyro: degree
             imu_.dtheta = imu_.dtheta / 180 * M_PI;
         }
-
-        imu_.dtheta = Cbv * imu_.dtheta;
-        imu_.dvel = Cbv * imu_.dvel;
+        
+        // 第一时刻dt为0，特殊处理
+        if (imu_.dt > MINIMUM_INTERVAL){
+            imu_.dtheta = Cbv * imu_.dtheta;
+            imu_.dvel = Cbv * imu_.dvel;
+        } else {
+            imu_.dtheta.setZero();
+            imu_.dvel.setZero();
+        }
 
         return imu_;
     }

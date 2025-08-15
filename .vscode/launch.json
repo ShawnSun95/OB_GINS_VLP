@@ -10,7 +10,7 @@
             "stopAtEntry": false,
             "cwd": "${workspaceFolder}",
             "environment": [],
-            "externalConsole": true,
+            "externalConsole": false,
             "MIMode": "gdb",
             "setupCommands": [
                 {
@@ -27,9 +27,12 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "cwd": "${workspaceFolder}",
-            "args": ["--optimized_poses", "./dataset/simu/OB_GINS_TXT.nav",
-                "--initial_poses", "./dataset/simu/temp.nav",
-                "--ground_truth", "./dataset/simu/reference.txt"],
+            // "args": ["--optimized_poses", "./dataset/simu/OB_GINS_TXT.nav",
+            //     "--initial_poses", "./dataset/simu/temp.nav",
+            //     "--ground_truth", "./dataset/simu/reference.txt"],
+            "args": ["--optimized_poses", "./dataset/1203/OB_GINS_TXT.nav",
+                "--initial_poses", "./dataset/1203/temp.nav",
+                "--ground_truth", "./dataset/1203/ground_truth_2022123_185806.txt"],
         }
     ]
 }
