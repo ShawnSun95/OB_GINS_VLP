@@ -23,7 +23,7 @@ public:
         
         // NEU to NED
         memcpy(vlp_.xyz.data(), &data_[1], 3 * sizeof(double));
-        vlp_.xyz[2] = -vlp_.xyz[2];
+        // vlp_.xyz[2] = -vlp_.xyz[2];  // 有些文件z轴写反了
 
         if(data_.size() == 4 + N){
             for (int i = 0; i < N; i++){

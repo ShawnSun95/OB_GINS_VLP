@@ -69,6 +69,7 @@ typedef struct IntegrationParameters {
 //用于将vlp数据传入imu中
 typedef struct imu_vlp{
     std::vector<double>LED;
+    std::vector<double> A;
     std::vector<double> M;
     int NLed;
     int windows;

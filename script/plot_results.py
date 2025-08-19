@@ -32,7 +32,7 @@ if options.optimized_poses != '':
   poses_optimized = np.genfromtxt(options.optimized_poses, usecols = (0, 1, 2, 3, 4, 5, 6, 7, 8, 9))
   
 ground_truth = None
-if options.ground_truth != '':
+if options.ground_truth != '' and options.optimized_poses != '':
   ground_truth = np.genfromtxt(options.ground_truth, usecols = (0, 1, 2, 3))
 
   # 提取时间戳
@@ -88,7 +88,8 @@ if options.ground_truth != '':
   # 子图 1
   ax1 = fig.add_subplot(4, 1, 1)
   ax1.plot(opt_timestamps, poses_optimized[:, 1], label='Optimized')
-  ax1.plot(poses_original[:, 0], poses_original[:, 1], label='Initial')
+  if options.initial_poses != '':
+    ax1.plot(poses_original[:, 0], poses_original[:, 1], label='Initial')
   ax1.plot(gt_timestamps, ground_truth[:, 1], '--', label='Ground Truth')
   ax1.set_title('Position X')
   ax1.set_xlabel('Timestamp')
@@ -98,7 +99,8 @@ if options.ground_truth != '':
   # 子图 2
   ax2 = fig.add_subplot(4, 1, 2)
   ax2.plot(opt_timestamps, poses_optimized[:, 2], label='Optimized')
-  ax2.plot(poses_original[:, 0], poses_original[:, 2], label='Initial')
+  if options.initial_poses != '':
+    ax2.plot(poses_original[:, 0], poses_original[:, 2], label='Initial')
   ax2.plot(gt_timestamps, ground_truth[:, 2], '--', label='Ground Truth')
   ax2.set_title('Position Y')
   ax2.set_xlabel('Timestamp')
@@ -108,7 +110,8 @@ if options.ground_truth != '':
   # 子图 3
   ax3 = fig.add_subplot(4, 1, 3)
   ax3.plot(opt_timestamps, poses_optimized[:, 3], label='Optimized')
-  ax3.plot(poses_original[:, 0], poses_original[:, 3], label='Initial')
+  if options.initial_poses != '':
+    ax3.plot(poses_original[:, 0], poses_original[:, 3], label='Initial')
   ax3.plot(gt_timestamps, ground_truth[:, 3], '--', label='Ground Truth')
   ax3.set_title('Position Z')
   ax3.set_xlabel('Timestamp')

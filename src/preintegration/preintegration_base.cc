@@ -59,6 +59,7 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
     std::vector<double>LED=vlp_->LED;
     int Nled=vlp_->NLed;
     int T=vlp_->windows;
+    std::vector<double>A=vlp_->A;
     std::vector<double>M=vlp_->M;
     int hz=vlp_->hz;
 
@@ -73,21 +74,28 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
         
         Vector3d D{LED[i*3+1]-current_state_.p(0),LED[i*3+0]-current_state_.p(1),-LED[i*3+2]-current_state_.p(2)};
         
-        Vector3d coef1=D.cross(n_LED)/D.dot(n_LED);
-        Vector3d coef2 = (-n_PD / n_PD.dot(D)).eval()
-                - (M[i] * n_LED / n_LED.dot(D)).eval()
-                + ((3 + M[i]) / D.squaredNorm()) * D;
+        // Vector3d coef1=-D.cross(n_PD)/D.dot(n_PD);
+        // Vector3d coef2 = (-n_PD / n_PD.dot(D)).eval()
+        //         - (M[i] * n_LED / n_LED.dot(D)).eval()
+        //         + ((3 + M[i]) / D.squaredNorm()) * D;
+
+        Vector3d coef3=-A[i]*D.cross(n_PD)*pow(D.dot(n_LED), M[i])/pow(D.norm(), 3+M[i]);
+        Vector3d coef4=-A[i]*n_PD*pow(D.dot(n_LED), M[i])/pow(D.norm(), 3+M[i])
+                -A[i]*M[i]*n_LED*D.dot(n_PD)*pow(D.dot(n_LED), M[i]-1)/pow(D.norm(), 3+M[i])
+                +A[i]*(3+M[i])*D.dot(n_PD)*pow(D.dot(n_LED), M[i])*D/pow(D.norm(), 5+M[i]);
 
         double dp1=0.0;double dp2=0.0;
+        if(D.dot(n_PD)/D.norm()<0.01 || D.dot(n_LED)/D.norm()<0.01)
+            continue;
         //判断时刻
         if(ti>=floor(ti) && ti<tk){
-            dp1=(tk-ti)*coef1.dot(dtheta)/hz/T;
-            dp1=dp1+(tk-ti)*coef2.dot(current_state_.v)/hz/T;
+            dp1=(tk-ti)*coef3.dot(dtheta)/T;
+            dp1=dp1+(tk-ti)*coef4.dot(current_state_.v)/hz/T;
             dRSS_first[i]+=dp1;
         } else {
             //时间段的后半段
-            dp2=-(ti-tk)*coef1.dot(dtheta)/hz/T;
-            dp2=dp2-(ti-tk)*coef2.dot(current_state_.v)/hz/T;
+            dp2=-(ti-tk)*coef3.dot(dtheta)/T;
+            dp2=dp2-(ti-tk)*coef4.dot(current_state_.v)/hz/T;
             dRSS_latter[i]+=dp2;
         }
     }

@@ -251,6 +251,7 @@ int main(int argc, char *argv[]) {
     vlp_1->NLed=Nled;
     vlp_1->windows=INTEGRATION_LENGTH;
     vlp_1->start_time=starttime;
+    vlp_1->A=vlp_power;
     vlp_1->M=M;
     vlp_1->hz=imudatarate;
 
@@ -308,6 +309,9 @@ int main(int argc, char *argv[]) {
                     parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
                 IMU imu_temp = imu_cur;
                 while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
+                    if ((imu_cur.time > endtime) || imufile.isEof()) {
+                        break;
+                    }
                     false_pre->addNewImu(imu_temp);
                     imu_temp = imufile.next(parameters->gravity);
                     imulist.push_back(imu_temp);
@@ -317,8 +321,10 @@ int main(int argc, char *argv[]) {
                 // RSS correction, start from the second obs
                 for (int i = 0; i < Nled; i++) { 
                     if(vlp_corr == true){
-                        vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
-                        vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
+                        // vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
+                        // vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
+                        vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i];
+                        vlp.RSS[i] -= false_pre->RSS_corrrection1()[i];
                     }
                 }
                 

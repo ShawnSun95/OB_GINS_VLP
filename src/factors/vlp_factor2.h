@@ -60,6 +60,10 @@ public:
                     double cos1 = LOS.dot(n_PD) / sqrt(h * h + s * s);
                     double cos2 = LOS.dot(n_LED) / sqrt(h * h + s * s);
                     double P = a[i] * cos1 * pow(cos2, M[i]) / (h * h + s * s);
+
+                    if(LOS.dot(n_PD)/LOS.norm()<0.01 || LOS.dot(n_LED)/LOS.norm()<0.01)
+                        continue;
+
                     residual(i, 0) = P - vlp_.RSS[i];
                     residual(i, 0) = residual(i, 0) / vlp_.RSS_std[i];
 

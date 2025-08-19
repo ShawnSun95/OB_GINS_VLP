@@ -55,6 +55,7 @@ imumodel:
     corrtime: 1.0 # hr
     
 # vlp parameters
+vlp_corr: true
 emission_power: [260.3664, 292.3724, 193.6872, 260.3664, 229.1224]
 lamber_coef: [0.7,0.9,0.9,1,1]
 
