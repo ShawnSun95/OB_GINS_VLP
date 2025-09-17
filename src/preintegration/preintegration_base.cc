@@ -89,12 +89,12 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
             continue;
         //判断时刻
         if(ti>=floor(ti) && ti<tk){
-            dp1=(tk-ti)*coef3.dot(dtheta)/T;
+            dp1=(tk-ti)*coef3.dot(current_state_.q.toRotationMatrix() * dtheta)/T;
             dp1=dp1+(tk-ti)*coef4.dot(current_state_.v)/hz/T;
             dRSS_first[i]+=dp1;
         } else {
             //时间段的后半段
-            dp2=-(ti-tk)*coef3.dot(dtheta)/T;
+            dp2=-(ti-tk)*coef3.dot(current_state_.q.toRotationMatrix() * dtheta)/T;
             dp2=dp2-(ti-tk)*coef4.dot(current_state_.v)/hz/T;
             dRSS_latter[i]+=dp2;
         }
