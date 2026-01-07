@@ -75,7 +75,14 @@ We provide a program to plot the navigation results and evaluate the accuracy ba
 python3 ./script/plot_results.py --optimized_poses ./dataset/1203/OB_GINS_TXT.nav --ground_truth ./dataset/1203/ground_truth_2022123_185806.txt  --initial_poses ./dataset/1203/temp.nav
 ```
 
-If you use OB_GINS_VLP in an academic work, please cite:
+Or for simulation data, we write some scripts:
+```shell
+./script/run_simu.sh
+./script/run_simu2.sh
+./script/run_simu3.sh
+```
+
+If you use OB_GINS_VLP in an academic work, please consider to cite:
 
     @article{sun2025sana,
         title={Tightly coupled VLP/INS integrated navigation by inclination estimation and blockage handling},

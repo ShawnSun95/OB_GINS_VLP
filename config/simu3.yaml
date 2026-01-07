@@ -65,7 +65,7 @@ imumodel:
 # vlp parameters
 #####
 NLED: 5
-vlp_corr: false
+vlp_corr: true
 LED: [0,0,5,5,0,5,2.5,2.5,5,5,5,5,0,5,5]
 emission_power: [500, 500, 500, 500, 500]
 lamber_coef: [1,1,1,1,1]
