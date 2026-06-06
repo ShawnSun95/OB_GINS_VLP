@@ -36,6 +36,8 @@
 #include "src/preintegration/preintegration_factor.h"
 
 #include <absl/time/clock.h>
+#include <algorithm>
+#include <cmath>
 #include <iomanip>
 #include <yaml-cpp/yaml.h>
 
@@ -49,6 +51,48 @@ void imuInterpolation(const IMU &imu01, IMU &imu00, IMU &imu11, double mid);
 
 void writeNavResult(double time, const IntegrationState &state, FileSaver &navfile,
                     FileSaver &errfile);
+
+bool isValidVlpFrame(const VLP &vlp, int nled, std::string *reason = nullptr) {
+    int near_zero_count = 0;
+    double rss_sum      = 0.0;
+    const int threshold = std::min(4, nled);
+
+    for (int i = 0; i < nled; i++) {
+        const double rss = vlp.RSS[i];
+        if (!std::isfinite(rss)) {
+            if (reason) {
+                *reason = "non-finite rss";
+            }
+            return false;
+        }
+        if (rss < 0.0) {
+            if (reason) {
+                *reason = "negative rss";
+            }
+            return false;
+        }
+        if (rss <= 0.2) {
+            near_zero_count++;
+        }
+        rss_sum += rss;
+    }
+
+    if (near_zero_count >= threshold) {
+        if (reason) {
+            *reason = "too many near-zero rss channels";
+        }
+        return false;
+    }
+
+    if (rss_sum < 1.0) {
+        if (reason) {
+            *reason = "rss sum too small";
+        }
+        return false;
+    }
+
+    return true;
+}
 
 int main(int argc, char *argv[]) {
 
@@ -131,15 +175,22 @@ int main(int argc, char *argv[]) {
     Vector3d bodyangle(vec.data());
     bodyangle *= D2R;
 
-    int Nled = 5;
+    int Nled = 6;
     bool vlp_corr = false;
     try {
         vlp_corr = config["vlp_corr"].as<bool>();
     } catch (YAML::Exception &exception) { }
     std::vector<double>vlp_power = config["emission_power"].as<std::vector<double>>();
-    std::vector<double>M={1,1,1,1,1};
+    std::vector<double>M={0.4313, 0.3485, 0.5762, 0.7756, 0.5558, 0.9801};
     std::vector<double>err={0.05,0.05,0.05};
-    std::vector<double>LED={0.351,1.342,2.832,3.56,1.15,2.841,1.711,3.305,2.840,3.5,6.249,2.833,0.352,5.972,2.839};
+    std::vector<double>LED={
+        4.5604, 0.7996, 2.99,
+        4.2862, 2.1105, 2.99,
+        4.5802, 3.4361, 2.99,
+        6.5215, 3.1602, 2.99,
+        6.5806, 2.1225, 2.99,
+        6.6521, 0.9161, 2.99
+    };
     try {
         Nled = config["NLED"].as<int>();
     } catch (YAML::Exception &exception) { }
@@ -204,6 +255,14 @@ int main(int argc, char *argv[]) {
     do {
         vlp = vlpfile.next();
     } while (vlp.time < starttime);
+    while (!vlpfile.isEOF()) {
+        std::string invalid_reason;
+        if (isValidVlpFrame(vlp, Nled, &invalid_reason)) {
+            break;
+        }
+        std::cout << "skip invalid vlp at " << lround(vlp.time) << " s: " << invalid_reason << std::endl;
+        vlp = vlpfile.next();
+    }
 
     // 初始位置, 求相对
     if(scheme == 2){
@@ -260,6 +319,7 @@ int main(int argc, char *argv[]) {
 
     // 读取下一个整秒vlp
     vlp = vlpfile.next();
+    
 
     // 下一个积分节点
     sow += INTEGRATION_LENGTH;
@@ -304,31 +364,37 @@ int main(int argc, char *argv[]) {
             // 当前IMU数据时间等于vlp数据时间, 读取新的vlp
             // add vlp and read new vlp
             if (fabs(vlp.time - sow) < MINIMUM_INTERVAL) {
-                // false preintegration, for RSS correction
-                std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
-                    parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
-                IMU imu_temp = imu_cur;
-                while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
-                    if ((imu_cur.time > endtime) || imufile.isEof()) {
-                        break;
-                    }
-                    false_pre->addNewImu(imu_temp);
-                    imu_temp = imufile.next(parameters->gravity);
-                    imulist.push_back(imu_temp);
-                    count4RSS++;
-                }
+                std::string invalid_reason;
+                const bool valid_vlp = isValidVlpFrame(vlp, Nled, &invalid_reason);
 
-                // RSS correction, start from the second obs
-                for (int i = 0; i < Nled; i++) { 
-                    if(vlp_corr == true){
-                        // vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
-                        // vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
-                        vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i];
-                        vlp.RSS[i] -= false_pre->RSS_corrrection1()[i];
+                if (valid_vlp) {
+                    // false preintegration, for RSS correction
+                    std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
+                        parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
+                    IMU imu_temp = imu_cur;
+                    while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
+                        if ((imu_cur.time > endtime) || imufile.isEof()) {
+                            break;
+                        }
+                        false_pre->addNewImu(imu_temp);
+                        imu_temp = imufile.next(parameters->gravity);
+                        imulist.push_back(imu_temp);
+                        count4RSS++;
                     }
+
+                    // RSS correction, start from the second obs
+                    for (int i = 0; i < Nled; i++) {
+                        if(vlp_corr == true){
+                            // vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
+                            // vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
+                            vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i];
+                            vlp.RSS[i] -= false_pre->RSS_corrrection1()[i];
+                        }
+                    }
+                    vlplist.push_back(vlp);
+                } else {
+                    std::cout << "skip invalid vlp at " << lround(vlp.time) << " s: " << invalid_reason << std::endl;
                 }
-                
-                vlplist.push_back(vlp);
 
                 vlp = vlpfile.next();
                 while ((vlp.std[0] > vlpthreshold) || (vlp.std[1] > vlpthreshold) ||
