@@ -57,35 +57,36 @@ if options.ground_truth != '' and options.optimized_poses != '':
   opt_cropped = poses_optimized[opt_indices, :]
 
   # 使用 numpy.searchsorted 找到每个优化位姿时间戳在 ground_truth 中最接近的时间戳的索引
-  # 注意：searchsorted 找的是插入位置，我们取左边或右边最近的
   indices = np.searchsorted(opt_cropped[:, 0], gt_cropped[:, 0], side='left')
 
   # 处理边界情况
-  # 对于每个索引，比较左边和右边（如果存在）哪个时间戳更接近
   distances = []
 
   for i, idx in enumerate(indices):
     gt_time = gt_cropped[i, 0]
-    gt_x, gt_y = gt_cropped[i, 1], gt_cropped[i, 2]
+    # Extract X, Y, and Z for Ground Truth
+    gt_x, gt_y, gt_z = gt_cropped[i, 1], gt_cropped[i, 2], gt_cropped[i, 3]
     
-    # 确定比较的候选索引
+    # Determine candidate indices
     candidates = []
     if idx > 0:
         candidates.append(idx - 1)
     if idx < len(opt_cropped[:, 0]):
         candidates.append(idx)
     
-    # 找到时间戳最接近的 opt 行
+    # Find the closest timestamp in optimized poses
     best_idx = min(candidates, key=lambda j: abs(opt_cropped[j, 0] - gt_time))
-    opt_x, opt_y = opt_cropped[best_idx, 1], opt_cropped[best_idx, 2]
     
-    # 计算欧几里得距离
-    distance = np.sqrt((opt_x - gt_x)**2 + (opt_y - gt_y)**2)
+    # Extract X, Y, and Z for Optimized Pose
+    opt_x, opt_y, opt_z = opt_cropped[best_idx, 1], opt_cropped[best_idx, 2], opt_cropped[best_idx, 3]
+    
+    # Calculate 3D Euclidean distance
+    distance = np.sqrt((opt_x - gt_x)**2 + (opt_y - gt_y)**2 + (opt_z - gt_z)**2)
     distances.append(distance)
 
   fig = plot.figure(figsize=(8, 10))
 
-  # 子图 1
+  # Subplot 1: Position X
   ax1 = fig.add_subplot(4, 1, 1)
   ax1.plot(opt_timestamps, poses_optimized[:, 1], label='Optimized')
   if options.initial_poses != '':
@@ -96,7 +97,7 @@ if options.ground_truth != '' and options.optimized_poses != '':
   ax1.set_ylabel('Position (m)')
   ax1.legend()
 
-  # 子图 2
+  # Subplot 2: Position Y
   ax2 = fig.add_subplot(4, 1, 2)
   ax2.plot(opt_timestamps, poses_optimized[:, 2], label='Optimized')
   if options.initial_poses != '':
@@ -107,7 +108,7 @@ if options.ground_truth != '' and options.optimized_poses != '':
   ax2.set_ylabel('Position (m)')
   ax2.legend()
 
-  # 子图 3
+  # Subplot 3: Position Z
   ax3 = fig.add_subplot(4, 1, 3)
   ax3.plot(opt_timestamps, poses_optimized[:, 3], label='Optimized')
   if options.initial_poses != '':
@@ -118,17 +119,17 @@ if options.ground_truth != '' and options.optimized_poses != '':
   ax3.set_ylabel('Position (m)')
   ax3.legend()
 
-  # 子图 4
+  # Subplot 4: 3D Position Error
   ax4 = fig.add_subplot(4, 1, 4)
   ax4.plot(gt_cropped[:, 0], distances)
-  ax4.set_title('2D Position Error')
+  ax4.set_title('3D Position Error')
   ax4.set_xlabel('Timestamp')
   ax4.set_ylabel('Distance (m)')
 
-  plot.tight_layout()  # 自动调整子图参数，使之填充整个图像区域
+  plot.tight_layout()
 
   err = np.mean(distances)
-  print('mean error:',err)
+  print('mean 3D error:', err) # Updated print message
 
 # Plots the results for the specified poses.
 fig=plot.figure()

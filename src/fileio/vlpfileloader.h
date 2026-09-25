@@ -20,6 +20,9 @@ public:
         data_ = load();
         
         vlp_.time = data_[0];
+
+        vlp_.RSS.resize(N);
+        vlp_.RSS_std.resize(N);
         
         // NEU to NED
         memcpy(vlp_.xyz.data(), &data_[1], 3 * sizeof(double));

@@ -2,6 +2,7 @@
 #define TYPES_H
 
 #include <Eigen/Geometry>
+#include <vector>
 
 using Eigen::Matrix3d;
 using Eigen::Quaterniond;
@@ -12,8 +13,8 @@ typedef struct VLP {
 
     Vector3d xyz;
     Vector3d std;
-    double RSS[20];
-    double RSS_std[20]; // max 20 LEDs
+    std::vector<double> RSS;
+    std::vector<double> RSS_std;
 } VLP;
 
 typedef struct IMU {
