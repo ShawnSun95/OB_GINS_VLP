@@ -29,6 +29,7 @@
 
 #include "src/factors/vlp_factor.h"
 #include "src/factors/vlp_factor2.h"
+#include "src/factors/initial_state_prior_factor.h"
 #include "src/factors/NHC_factor.h"
 #include "src/factors/pose_parameterization.h"
 #include "src/preintegration/imu_error_factor.h"
@@ -51,48 +52,6 @@ void imuInterpolation(const IMU &imu01, IMU &imu00, IMU &imu11, double mid);
 
 void writeNavResult(double time, const IntegrationState &state, FileSaver &navfile,
                     FileSaver &errfile);
-
-bool isValidVlpFrame(const VLP &vlp, int nled, std::string *reason = nullptr) {
-    int near_zero_count = 0;
-    double rss_sum      = 0.0;
-    const int threshold = std::min(4, nled);
-
-    for (int i = 0; i < nled; i++) {
-        const double rss = vlp.RSS[i];
-        if (!std::isfinite(rss)) {
-            if (reason) {
-                *reason = "non-finite rss";
-            }
-            return false;
-        }
-        if (rss < 0.0) {
-            if (reason) {
-                *reason = "negative rss";
-            }
-            return false;
-        }
-        if (rss <= 0.2) {
-            near_zero_count++;
-        }
-        rss_sum += rss;
-    }
-
-    if (near_zero_count >= threshold) {
-        if (reason) {
-            *reason = "too many near-zero rss channels";
-        }
-        return false;
-    }
-
-    if (rss_sum < 1.0) {
-        if (reason) {
-            *reason = "rss sum too small";
-        }
-        return false;
-    }
-
-    return true;
-}
 
 int main(int argc, char *argv[]) {
 
@@ -131,6 +90,37 @@ int main(int argc, char *argv[]) {
     vec = config["initatt"].as<std::vector<double>>();
     Vector3d initatt(vec.data());
     initatt *= D2R;
+
+    // Initial-node prior defaults to the settings used by 1203c0.yaml.
+    // A configuration can still disable it explicitly with enabled: false.
+    const auto initial_prior = config["initial_state_prior"];
+    const bool use_initial_prior =
+        initial_prior ? initial_prior["enabled"].as<bool>(true) : true;
+    Vector3d initial_attitude_std = Vector3d(2.0, 2.0, 5.0) * D2R;
+    Vector3d initial_velocity_std = Vector3d::Constant(0.05);
+    if (use_initial_prior) {
+        try {
+            auto att_std = initial_prior && initial_prior["attitude_std_deg"]
+                               ? initial_prior["attitude_std_deg"].as<std::vector<double>>()
+                               : std::vector<double>{2.0, 2.0, 5.0};
+            auto vel_std = initial_prior && initial_prior["velocity_std"]
+                               ? initial_prior["velocity_std"].as<std::vector<double>>()
+                               : std::vector<double>{0.05, 0.05, 0.05};
+            if (att_std.size() != 3 || vel_std.size() != 3)
+                throw std::runtime_error("expected three attitude and velocity standard deviations");
+            for (int k = 0; k < 3; ++k) {
+                if (!std::isfinite(att_std[k]) || att_std[k] <= 0 ||
+                    !std::isfinite(vel_std[k]) || vel_std[k] <= 0)
+                    throw std::runtime_error("standard deviations must be finite and positive");
+                initial_attitude_std[k] = att_std[k] * D2R;
+                initial_velocity_std[k] = vel_std[k];
+            }
+        } catch (const std::exception &error) {
+            std::cerr << "Invalid initial_state_prior: " << error.what() << std::endl;
+            return -1;
+        }
+    }
+
 
     vec = config["initgb"].as<std::vector<double>>();
     Vector3d initbg(vec.data());
@@ -175,7 +165,7 @@ int main(int argc, char *argv[]) {
     Vector3d bodyangle(vec.data());
     bodyangle *= D2R;
 
-    int Nled = 6;
+    int Nled = 5;
     bool vlp_corr = false;
     try {
         vlp_corr = config["vlp_corr"].as<bool>();
@@ -184,12 +174,11 @@ int main(int argc, char *argv[]) {
     std::vector<double>M={0.4313, 0.3485, 0.5762, 0.7756, 0.5558, 0.9801};
     std::vector<double>err={0.05,0.05,0.05};
     std::vector<double>LED={
-        4.5604, 0.7996, 2.99,
-        4.2862, 2.1105, 2.99,
-        4.5802, 3.4361, 2.99,
-        6.5215, 3.1602, 2.99,
-        6.5806, 2.1225, 2.99,
-        6.6521, 0.9161, 2.99
+        0.351, 1.342, 2.832,
+        3.560, 1.150, 2.841,
+        1.711, 3.305, 2.840,
+        3.500, 6.249, 2.833,
+        0.352, 5.972, 2.839
     };
     try {
         Nled = config["NLED"].as<int>();
@@ -255,14 +244,6 @@ int main(int argc, char *argv[]) {
     do {
         vlp = vlpfile.next();
     } while (vlp.time < starttime);
-    while (!vlpfile.isEOF()) {
-        std::string invalid_reason;
-        if (isValidVlpFrame(vlp, Nled, &invalid_reason)) {
-            break;
-        }
-        std::cout << "skip invalid vlp at " << lround(vlp.time) << " s: " << invalid_reason << std::endl;
-        vlp = vlpfile.next();
-    }
 
     // 初始位置, 求相对
     if(scheme == 2){
@@ -293,6 +274,10 @@ int main(int argc, char *argv[]) {
         .abv  = {bodyangle[1], bodyangle[2]},
     };
     std::cout << "Initilization at " << vlp.time << " s " << std::endl;
+
+    const double initial_prior_time = vlp.time;
+    const Quaterniond initial_prior_attitude = state_curr.q;
+    const Vector3d initial_prior_velocity = state_curr.v;
 
     statelist[0]     = state_curr;
     statedatalist[0] = Preintegration::stateToData(state_curr, preintegration_options);
@@ -364,37 +349,30 @@ int main(int argc, char *argv[]) {
             // 当前IMU数据时间等于vlp数据时间, 读取新的vlp
             // add vlp and read new vlp
             if (fabs(vlp.time - sow) < MINIMUM_INTERVAL) {
-                std::string invalid_reason;
-                const bool valid_vlp = isValidVlpFrame(vlp, Nled, &invalid_reason);
-
-                if (valid_vlp) {
-                    // false preintegration, for RSS correction
-                    std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
-                        parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
-                    IMU imu_temp = imu_cur;
-                    while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
-                        if ((imu_cur.time > endtime) || imufile.isEof()) {
-                            break;
-                        }
-                        false_pre->addNewImu(imu_temp);
-                        imu_temp = imufile.next(parameters->gravity);
-                        imulist.push_back(imu_temp);
-                        count4RSS++;
+                // false preintegration, for RSS correction
+                std::shared_ptr<PreintegrationBase> false_pre = Preintegration::createPreintegration(
+                    parameters, imu_pre, preintegrationlist.back()->currentState(), preintegration_options, vlp_1);
+                IMU imu_temp = imu_cur;
+                while (imu_temp.time <= sow + INTEGRATION_LENGTH / 2.0) {
+                    if ((imu_cur.time > endtime) || imufile.isEof()) {
+                        break;
                     }
-
-                    // RSS correction, start from the second obs
-                    for (int i = 0; i < Nled; i++) {
-                        if(vlp_corr == true){
-                            // vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
-                            // vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
-                            vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i];
-                            vlp.RSS[i] -= false_pre->RSS_corrrection1()[i];
-                        }
-                    }
-                    vlplist.push_back(vlp);
-                } else {
-                    std::cout << "skip invalid vlp at " << lround(vlp.time) << " s: " << invalid_reason << std::endl;
+                    false_pre->addNewImu(imu_temp);
+                    imu_temp = imufile.next(parameters->gravity);
+                    imulist.push_back(imu_temp);
+                    count4RSS++;
                 }
+
+                // RSS correction, start from the second obs
+                for (int i = 0; i < Nled; i++) {
+                    if(vlp_corr == true){
+                        // vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i] * vlp.RSS[i];
+                        // vlp.RSS[i] -= false_pre->RSS_corrrection1()[i] * vlp.RSS[i];
+                        vlp.RSS[i] -= preintegrationlist.back()->RSS_corrrection2()[i];
+                        vlp.RSS[i] -= false_pre->RSS_corrrection1()[i];
+                    }
+                }
+                vlplist.push_back(vlp);
 
                 vlp = vlpfile.next();
                 while ((vlp.std[0] > vlpthreshold) || (vlp.std[1] > vlpthreshold) ||
@@ -467,6 +445,15 @@ int main(int argc, char *argv[]) {
 
                     problem.AddParameterBlock(statedatalist[k].mix,
                                             Preintegration::numMixParameter(preintegration_options));
+                }
+
+                // Keep the prior attached to the original node while it is in the window.
+                if (use_initial_prior && fabs(timelist.front() - initial_prior_time) < MINIMUM_INTERVAL) {
+                    auto factor = new InitialStatePriorFactor(
+                        initial_prior_attitude, initial_prior_velocity,
+                        initial_attitude_std, initial_velocity_std,
+                        Preintegration::numMixParameter(preintegration_options));
+                    problem.AddResidualBlock(factor, nullptr, statedatalist[0].pose, statedatalist[0].mix);
                 }
 
                 // vlp残差

@@ -11,6 +11,7 @@
 
 #include "src/common/earth.h"
 #include "src/common/rotation.h"
+#include "src/common/rotation.h"
 #include "src/common/types.h"
 
 const double clight = 299792458.0;
@@ -86,43 +87,51 @@ public:
     }
 
     bool Evaluate(const double *const *parameters, double *residuals, double **jacobians) const override {
-        Vector3d p{parameters[0][0], parameters[0][1], parameters[0][2]};
+        Vector3d p_imu{parameters[0][0], parameters[0][1], parameters[0][2]};
         Quaterniond q{parameters[0][6], parameters[0][3], parameters[0][4], parameters[0][5]};
         
         Eigen::Map<Eigen::Matrix<double, 6, 1>> residual(residuals);
         residual.setZero();
-        if (jacobians) {
-            if (jacobians[0]) {
+        if (jacobians && jacobians[0]) {
+            Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor>> jacobian(jacobians[0]);
+            jacobian.setZero();
+        }
+
+        // The state is at the IMU; RSS is measured at the photodiode.
+        const Matrix3d R = q.toRotationMatrix();
+        const Vector3d p = p_imu + R * lever_;
+        const Matrix3d dp_dtheta = -R * Rotation::skewSymmetric(lever_);
+
+        Vector3d unit(0, 0, -1);
+        Vector3d n_PD = q.toRotationMatrix() * unit;
+        Vector3d n_LED{0, 0, -1};
+
+        // Ceres also evaluates residuals without requesting Jacobians.
+        for (int i = 0; i < Nled; i++) {
+            double h = LED[i*3+2] + p(2);
+            double s = sqrt((LED[i*3+1]-p(0))*(LED[i*3+1]-p(0))+(LED[i*3+0]-p(1))*(LED[i*3+0]-p(1)));
+            Vector3d LOS{LED[i*3+1] - p(0), LED[i*3+0] - p(1), -h}; // NED system
+            double cos1 = LOS.dot(n_PD) / sqrt(h * h + s * s);
+            double cos2 = LOS.dot(n_LED) / sqrt(h * h + s * s);
+            double P = a[i] * cos1 * pow(cos2, M[i]) / (h * h + s * s);
+
+            if (LOS.dot(n_PD)/LOS.norm()<0.01 || LOS.dot(n_LED)/LOS.norm()<0.01)
+                continue;
+
+            residual(i, 0) = (P - vlp_.RSS[i]) / vlp_.RSS_std[i];
+
+            if (jacobians && jacobians[0]) {
                 Eigen::Map<Eigen::Matrix<double, 6, 7, Eigen::RowMajor>> jacobian(jacobians[0]);
-                jacobian.setZero();
+                jacobian(i, 0) = P * (-n_PD[0] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+1] - p(0))/(h * h + s * s));
+                jacobian(i, 1) = P * (-n_PD[1] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+0] - p(1))/(h * h + s * s));
+                jacobian(i, 2) = P * (-n_PD[2] / LOS.dot(n_PD) -M[i]*n_LED[2]/n_LED.dot(LOS) +
+                    (3 + M[i])*(-LED[i*3+2] - p(2))/(h * h + s * s));
 
-                Vector3d unit(0, 0, -1);
-                Vector3d n_PD = q.toRotationMatrix() * unit;
-                Vector3d n_LED{0, 0, -1};
-
-                for (int i = 0; i < Nled; i++){
-                    double h = LED[i*3+2] + p(2);
-                    double s = sqrt((LED[i*3+1]-p(0))*(LED[i*3+1]-p(0))+(LED[i*3+0]-p(1))*(LED[i*3+0]-p(1)));
-                    Vector3d LOS{LED[i*3+1] - p(0), LED[i*3+0] - p(1), -h}; // NED system
-                    double cos1 = LOS.dot(n_PD) / sqrt(h * h + s * s);
-                    double cos2 = LOS.dot(n_LED) / sqrt(h * h + s * s);
-                    double P = a[i] * cos1 * pow(cos2, M[i]) / (h * h + s * s);
-
-                    if(LOS.dot(n_PD)/LOS.norm()<0.01 || LOS.dot(n_LED)/LOS.norm()<0.01)
-                        continue;
-
-                    residual(i, 0) = P - vlp_.RSS[i];
-                    residual(i, 0) = residual(i, 0) / vlp_.RSS_std[i];
-
-                    jacobian(i, 0) = P * (-n_PD[0] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+1] - p(0))/(h * h + s * s));
-                    jacobian(i, 1) = P * (-n_PD[1] / LOS.dot(n_PD) + (3 + M[i])*(LED[i*3+0] - p(1))/(h * h + s * s));
-                    jacobian(i, 2) = P * (-n_PD[2] / LOS.dot(n_PD) -M[i]*n_LED[2]/n_LED.dot(LOS) + 
-                        (3 + M[i])*(-LED[i*3+2] - p(2))/(h * h + s * s));
-
-                    jacobian.block<1, 3>(i, 3) = -P * LOS.cross(n_PD) / LOS.dot(n_PD);
-                    jacobian.block<1, 3>(i, 3) = jacobian.block<1, 3>(i, 3) * q.toRotationMatrix();
-                    jacobian.block<1, 7>(i, 0) = jacobian.block<1, 7>(i, 0) / vlp_.RSS_std[i];
-                }
+                jacobian.block<1, 3>(i, 3) = -P * LOS.cross(n_PD) / LOS.dot(n_PD);
+                jacobian.block<1, 3>(i, 3) = jacobian.block<1, 3>(i, 3) * R;
+                // Right rotation increments move both the normal and the photodiode.
+                jacobian.block<1, 3>(i, 3) += jacobian.block<1, 3>(i, 0) * dp_dtheta;
+                jacobian.block<1, 7>(i, 0) = jacobian.block<1, 7>(i, 0) / vlp_.RSS_std[i];
             }
         }
         return true;
