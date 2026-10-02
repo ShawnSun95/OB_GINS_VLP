@@ -23,7 +23,7 @@ endtime: 19
 # Initialization parameters
 initcoordinate: [31.4833,114.3502,28]
 initpos: [2.5,4.5,0] # bug, should be NED, not NEU
-initvel: [3,0,-0.1]  # 北东地速度 (NED velocity), m/s
+initvel: [2,0,-0.1]  # 北东地速度 (NED velocity), m/s
 initatt: [0,0,0]     # 横滚俯仰航向 (RPY attitude), deg
 
 # IMU初始误差
@@ -51,10 +51,10 @@ odometer:
 # IMU noise parameters
 #####
 imumodel:
-    arw: 0.015     # deg/sqrt(hr)
-    vrw: 0.01    # m/s/sqrt(hr)
-    gbstd: 0.5   # deg/hr
-    abstd: 10   # mGal
+    arw: 0.04     # deg/sqrt(hr)
+    vrw: 0.1    # m/s/sqrt(hr)
+    gbstd: 0.8   # deg/hr
+    abstd: 5   # mGal
     #arw: 0.015     # deg/sqrt(hr)
     #vrw: 0.01    # m/s/sqrt(hr)
     #gbstd: 0.5   # deg/hr
@@ -66,8 +66,12 @@ imumodel:
 NLED: 5
 vlp_corr: true
 LED: [0,0,5,5,0,5,2.5,2.5,5,5,5,5,0,5,5]
-emission_power: [500, 500, 500, 500, 500]
-lamber_coef: [1,1,1,1,1]
+# emission_power: [500, 500, 500, 500, 500]
+# lamber_coef: [1,1,1,1,1]
+# emission_power: [533.3693,531.1154,507.724,533.0641,535.8629]
+# lamber_coef: [1.1348,1.1403,0.94085,1.1695,1.204]
+emission_power: [520.1949,525.4006,508.6385,528.0037,524.2609]
+lamber_coef: [1.0241,1.0785,0.99247,1.0732,1.066]
 err: [0.05,0.05,0.05]
 
 # vlp仿真中断配置

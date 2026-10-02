@@ -18,12 +18,12 @@ outputpath: "dataset/simu/"
 #####
 windows: 5
 starttime: 0
-endtime: 29
+endtime: 69
 
 # 初始化信息
 # Initialization parameters
 initcoordinate: [31.4833,114.3502,28]
-initpos: [0,5,0] # bug, should be NED, not NEU
+initpos: [3,18,0] # bug, should be NED, not NEU
 initvel: [0,0,0]  # 北东地速度 (NED velocity), m/s
 initatt: [0,0,0]     # 横滚俯仰航向 (RPY attitude), deg
 
@@ -64,11 +64,11 @@ imumodel:
     
 # vlp parameters
 #####
-NLED: 5
-vlp_corr: true
-LED: [0,0,5,5,0,5,2.5,2.5,5,5,5,5,0,5,5]
-emission_power: [500, 500, 500, 500, 500]
-lamber_coef: [1,1,1,1,1]
+NLED: 25
+vlp_corr: false
+LED: [0, 0, 5, 5, 0, 5, 10, 0, 5, 15, 0, 5, 20, 0, 5, 0, 5, 5, 5, 5, 5, 10, 5, 5, 15, 5, 5, 20, 5, 5, 0, 10, 5, 5, 10, 5, 10, 10, 5, 15, 10, 5, 20, 10, 5, 0, 15, 5, 5, 15, 5, 10, 15, 5, 15, 15, 5, 20, 15, 5, 0, 20, 5, 5, 20, 5, 10, 20, 5, 15, 20, 5, 20, 20, 5]
+emission_power: [500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500, 500]
+lamber_coef: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1]
 err: [0.05,0.05,0.05]
 
 # vlp仿真中断配置
