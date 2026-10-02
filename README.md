@@ -102,7 +102,7 @@ own frame options (see its `--help`).
 
 Or for simulation data, we write some scripts:
 ```shell
-./script/run_simu1.sh
+./script/run_simu.sh
 ./script/run_simu2.sh
 ./script/run_simu3.sh
 ```

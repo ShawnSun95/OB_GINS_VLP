@@ -23,7 +23,7 @@ endtime: 19
 # 初始化信息
 # Initialization parameters
 initcoordinate: [31.4833,114.3502,28]
-initpos: [2.5,5.5,0] # bug, should be NED, not NEU
+initpos: [2.5,4.5,0] # 与 VLP/reference 首帧一致；程序内部将 Z 取负
 initvel: [0,0,0]  # 北东地速度 (NED velocity), m/s
 initatt: [0,0,0]     # 横滚俯仰航向 (RPY attitude), deg
 

@@ -26,6 +26,12 @@ initpos: [1.6, 1.6,  0.31] # bug, should be NED, not NEU
 initvel: [ 0, 0, 0 ]   # 北东地速度 (NED velocity), m/s
 initatt: [ 0, 0, 90 ] # 横滚俯仰航向 (RPY attitude), deg
 
+# 初始姿态/速度软约束，仅作用于首节点；逐组验证设置。
+initial_state_prior:
+  enabled: true
+  attitude_std_deg: [1, 1, 3]
+  velocity_std: [0.02, 0.02, 0.02]
+
 # IMU初始误差
 # IMU constant biases
 initgb: [0, 0, 0]  # 初始陀螺零偏 (gyroscope biases), deg/hr
