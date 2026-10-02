@@ -69,15 +69,40 @@ cd ..
 
 ## 3 Plot the results and evaluate the accuracy
 
-We provide a program to plot the navigation results and evaluate the accuracy based on a ground truth positions. You could follow an example:
+The plotting script saves PNG figures beside `--optimized_poses` by default.
+Add `--show` to also open plot windows. `--ground_truth` and `--initial_poses`
+are optional; initial poses are displayed but do not enter the error calculation.
+
+For the 1203 reference file, XY already have the navigation output's order,
+but height is positive upward. Use `--ground_truth_frame neu` to negate only Z:
 
 ```shell
-python3 ./script/plot_results.py --optimized_poses ./dataset/1203/OB_GINS_TXT.nav --ground_truth ./dataset/1203/ground_truth_2022123_185806.txt  --initial_poses ./dataset/1203/temp.nav
+python3 ./script/plot_results.py \
+  --optimized_poses ./dataset/1203/OB_GINS_TXT.nav \
+  --ground_truth ./dataset/1203/ground_truth_2022123_185806.txt \
+  --ground_truth_frame neu \
+  --initial_poses ./dataset/1203/temp.nav
 ```
+
+`plot_results.py` assumes the navigation files are NED (North, East, Down).
+Choose the reference convention explicitly:
+
+| `--ground_truth_frame` | Reference position columns | Conversion to navigation coordinates |
+|---|---|---|
+| `ned` (default) | North, East, Down | No conversion; preserves previous behavior |
+| `neu` | North, East, Up | Keep XY and negate Z |
+| `enu` | East, North, Up | Swap X/Y and negate Z |
+
+The conversion applies to **both plots and error metrics**, only for the reference
+positions. It does not modify files, navigation poses, timestamps, or origins.
+There is no automatic frame detection or fitted trajectory alignment.
+
+The frame options above describe `plot_results.py`; `plot_results_3d.py` has its
+own frame options (see its `--help`).
 
 Or for simulation data, we write some scripts:
 ```shell
-./script/run_simu.sh
+./script/run_simu1.sh
 ./script/run_simu2.sh
 ./script/run_simu3.sh
 ```

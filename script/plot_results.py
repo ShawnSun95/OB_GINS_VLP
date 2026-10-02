@@ -7,7 +7,9 @@
 # The positioning error of "optimized_poses" will be evaluated based on the "ground_truth" file.
 
 
-import matplotlib.pyplot as plot
+from pathlib import Path
+
+import matplotlib
 import numpy as np
 import sys
 from optparse import OptionParser
@@ -20,7 +22,22 @@ parser.add_option("--optimized_poses", dest="optimized_poses",
                   default="", help="The filename that contains the optimized poses.")
 parser.add_option("--ground_truth", dest="ground_truth",
                   default="", help="The filename that contains the ground truth.")
+parser.add_option("--ground_truth_frame", type="choice", choices=("ned", "neu", "enu"),
+                  default="ned", help="Reference frame: ned (unchanged, default), "
+                  "neu (negate Z), or enu (swap X/Y and negate Z). "
+                  "Navigation output is assumed to be NED.")
+parser.add_option("--show", action="store_true", default=False,
+                  help="Show plot windows after saving (default: save only).")
 (options, args) = parser.parse_args()
+
+if not options.optimized_poses:
+  parser.error("--optimized_poses is required")
+if not options.show:
+  matplotlib.use("Agg")
+import matplotlib.pyplot as plot
+
+output_file = Path(options.optimized_poses)
+figures_to_save = []
 
 # Read the original and optimized poses files.
 poses_original = None
@@ -34,6 +51,15 @@ if options.optimized_poses != '':
 ground_truth = None
 if options.ground_truth != '' and options.optimized_poses != '':
   ground_truth = np.genfromtxt(options.ground_truth, usecols = (0, 1, 2, 3))
+
+  # Convert only reference positions to the navigation output's NED frame.
+  # Apply before both plotting and error evaluation; never modify the input file.
+  ground_truth = np.atleast_2d(ground_truth)
+  if options.ground_truth_frame == "enu":
+    ground_truth[:, [1, 2]] = ground_truth[:, [2, 1]]
+  if options.ground_truth_frame in ("neu", "enu"):
+    ground_truth[:, 3] *= -1
+  print(f"ground truth frame: {options.ground_truth_frame} -> ned")
 
   # 提取时间戳
   gt_timestamps = ground_truth[:, 0]
@@ -84,55 +110,42 @@ if options.ground_truth != '' and options.optimized_poses != '':
     distance = np.sqrt((opt_x - gt_x)**2 + (opt_y - gt_y)**2 + (opt_z - gt_z)**2)
     distances.append(distance)
 
-  fig = plot.figure(figsize=(8, 10))
+  fig = plot.figure(figsize=(10, 8))
+  figures_to_save.append((fig, "position_error"))
 
-  # Subplot 1: Position X
-  ax1 = fig.add_subplot(4, 1, 1)
-  ax1.plot(opt_timestamps, poses_optimized[:, 1], label='Optimized')
-  if options.initial_poses != '':
-    ax1.plot(poses_original[:, 0], poses_original[:, 1], label='Initial')
-  ax1.plot(gt_timestamps, ground_truth[:, 1], '--', label='Ground Truth')
-  ax1.set_title('Position X')
+  # 用颜色区分位置分量，用线型区分数据来源。
+  ax1 = fig.add_subplot(2, 1, 1)
+  for column, component, color in ((1, 'X', 'C0'), (2, 'Y', 'C1'), (3, 'Z', 'C2')):
+    ax1.plot(opt_timestamps, poses_optimized[:, column],
+             color=color, label=f'Optimized {component}')
+    if poses_original is not None:
+      ax1.plot(poses_original[:, 0], poses_original[:, column], ':',
+               color=color, label=f'Initial {component}')
+    ax1.plot(gt_timestamps, ground_truth[:, column], '--',
+             color=color, label=f'Ground Truth {component}')
+  ax1.set_title('Position Components')
   ax1.set_xlabel('Timestamp')
   ax1.set_ylabel('Position (m)')
-  ax1.legend()
+  ax1.legend(ncol=3)
+  ax1.grid(True)
 
-  # Subplot 2: Position Y
-  ax2 = fig.add_subplot(4, 1, 2)
-  ax2.plot(opt_timestamps, poses_optimized[:, 2], label='Optimized')
-  if options.initial_poses != '':
-    ax2.plot(poses_original[:, 0], poses_original[:, 2], label='Initial')
-  ax2.plot(gt_timestamps, ground_truth[:, 2], '--', label='Ground Truth')
-  ax2.set_title('Position Y')
+  ax2 = fig.add_subplot(2, 1, 2)
+  ax2.plot(gt_cropped[:, 0], distances, label='3D Position Error')
+  ax2.set_title('3D Position Error')
   ax2.set_xlabel('Timestamp')
-  ax2.set_ylabel('Position (m)')
+  ax2.set_ylabel('Distance (m)')
   ax2.legend()
-
-  # Subplot 3: Position Z
-  ax3 = fig.add_subplot(4, 1, 3)
-  ax3.plot(opt_timestamps, poses_optimized[:, 3], label='Optimized')
-  if options.initial_poses != '':
-    ax3.plot(poses_original[:, 0], poses_original[:, 3], label='Initial')
-  ax3.plot(gt_timestamps, ground_truth[:, 3], '--', label='Ground Truth')
-  ax3.set_title('Position Z')
-  ax3.set_xlabel('Timestamp')
-  ax3.set_ylabel('Position (m)')
-  ax3.legend()
-
-  # Subplot 4: 3D Position Error
-  ax4 = fig.add_subplot(4, 1, 4)
-  ax4.plot(gt_cropped[:, 0], distances)
-  ax4.set_title('3D Position Error')
-  ax4.set_xlabel('Timestamp')
-  ax4.set_ylabel('Distance (m)')
+  ax2.grid(True)
 
   plot.tight_layout()
 
   err = np.mean(distances)
-  print('mean 3D error:', err) # Updated print message
+  print('mean 3D error:', err)
+  print('RMSE 3D error:', np.sqrt(np.mean(np.square(distances))))
 
 # Plots the results for the specified poses.
 fig=plot.figure()
+figures_to_save.append((fig, "trajectory_2d"))
 if poses_original is not None:
   plot.plot(poses_original[:, 2], poses_original[:, 1], '*-', label="Original",
             alpha=0.5, color="green")
@@ -142,62 +155,44 @@ if poses_optimized is not None:
             alpha=0.5, color="blue")
 
 if ground_truth is not None:
-  plot.plot(ground_truth[:, 2], ground_truth[:, 1], '--', color="red")
+  plot.plot(ground_truth[:, 2], ground_truth[:, 1], '--', color="red", label="Ground Truth")
 
 plot.title('2D Position Comparison (m)')
 plot.grid(True)
 plot.axis('equal')
 plot.legend(loc='best')
 
-# 三轴速度曲线
-fig1 = plot.figure(figsize=(8, 8))
+# 三轴速度曲线：三个分量共享坐标轴。
+fig1, ax_velocity = plot.subplots(figsize=(10, 5))
+figures_to_save.append((fig1, "velocity"))
+for column, component in ((4, 'X'), (5, 'Y'), (6, 'Z')):
+  ax_velocity.plot(poses_optimized[:, 0], poses_optimized[:, column],
+                   label=f'Velocity {component}')
+ax_velocity.set_title('Triaxial Velocity Curves')
+ax_velocity.set_xlabel('Time (s)')
+ax_velocity.set_ylabel('Velocity (m/s)')
+ax_velocity.legend()
+ax_velocity.grid(True)
+fig1.tight_layout()
 
-plot.subplot(3, 1, 1)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 4], label='Velocity X')
-plot.ylabel('Vx (m/s)')
-plot.title('Triaxial Velocity Curves')
-plot.legend()
-plot.grid(True)
+# 三轴姿态角曲线：导航文件中的角度单位为度。
+fig2, ax_attitude = plot.subplots(figsize=(10, 5))
+figures_to_save.append((fig2, "attitude"))
+for column, component in ((7, 'Roll (X)'), (8, 'Pitch (Y)'), (9, 'Yaw (Z)')):
+  ax_attitude.plot(poses_optimized[:, 0], poses_optimized[:, column], label=component)
+ax_attitude.set_title('Triaxial Attitude Angle Curves')
+ax_attitude.set_xlabel('Time (s)')
+ax_attitude.set_ylabel('Angle (deg)')
+ax_attitude.legend()
+ax_attitude.grid(True)
+fig2.tight_layout()
 
-plot.subplot(3, 1, 2)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 5], label='Velocity Y')
-plot.ylabel('Vy (m/s)')
-plot.legend()
-plot.grid(True)
+# Save every figure beside the optimized poses, then optionally show windows.
+for figure, name in figures_to_save:
+  save_path = output_file.parent / f"{output_file.stem}_{name}.png"
+  figure.savefig(save_path, dpi=200, bbox_inches="tight")
+  print(f"figure saved to: {save_path}")
 
-plot.subplot(3, 1, 3)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 6], label='Velocity Z')
-plot.ylabel('Vz (m/s)')
-plot.xlabel('Time (s)')
-plot.legend()
-plot.grid(True)
-
-plot.tight_layout()
-
-# 三轴姿态角曲线（如 roll, pitch, yaw）
-fig2 = plot.figure(figsize=(8, 8))
-
-plot.subplot(3, 1, 1)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 7], label='Roll (X)')
-plot.ylabel('Angle (rad)')
-plot.title('Triaxial Attitude Angle Curves')
-plot.legend()
-plot.grid(True)
-
-plot.subplot(3, 1, 2)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 8], label='Pitch (Y)')
-plot.ylabel('Angle (rad)')
-plot.legend()
-plot.grid(True)
-
-plot.subplot(3, 1, 3)
-plot.plot(poses_optimized[:, 0], poses_optimized[:, 9], label='Yaw (Z)')
-plot.ylabel('Angle (rad)')
-plot.xlabel('Time (s)')
-plot.legend()
-plot.grid(True)
-
-plot.tight_layout()
-
-# Show the plot and wait for the user to close.
-plot.show()
+if options.show:
+  plot.show()
+plot.close("all")

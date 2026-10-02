@@ -5,4 +5,5 @@ bin/
 build/
 config/
 dataset/
+tests/
 *.sh

@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import matplotlib.pyplot as plt
+import matplotlib
 import numpy as np
 
 
@@ -102,7 +102,7 @@ def print_metrics(xyz_error: np.ndarray, error_3d: np.ndarray) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Plot 3D trajectories and compute 3D position error."
+        description="Plot 3D trajectories; optionally compare against ground truth."
     )
     parser.add_argument(
         "--initial_poses",
@@ -116,8 +116,8 @@ def main() -> None:
     )
     parser.add_argument(
         "--ground_truth",
-        required=True,
-        help="Ground-truth file, columns: t E N U or t N E D",
+        default="",
+        help="Optional ground-truth file, columns: t E N U or t N E D",
     )
     parser.add_argument(
         "--ground_truth_frame",
@@ -128,32 +128,46 @@ def main() -> None:
     parser.add_argument(
         "--save",
         default="",
-        help="Optional path for saving the generated figure.",
+        help="Figure path (default: <optimized poses directory>/<stem>_results_3d.png).",
+    )
+    parser.add_argument(
+        "--show",
+        action="store_true",
+        help="Show the plot window after saving (default: save only).",
     )
     args = parser.parse_args()
 
+    if not args.show:
+        matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+
     poses_original = load_nav_file(args.initial_poses) if args.initial_poses else None
     poses_optimized = load_nav_file(args.optimized_poses)
-    ground_truth = load_ground_truth(args.ground_truth, args.ground_truth_frame)
-
-    gt_cropped, opt_cropped = crop_to_common_time(ground_truth, poses_optimized)
-    matched_indices = nearest_time_indices(gt_cropped[:, 0], opt_cropped[:, 0])
-    matched_optimized = opt_cropped[matched_indices]
-
-    xyz_error, error_3d = compute_error_metrics(gt_cropped[:, 1:4], matched_optimized[:, 1:4])
-    print_metrics(xyz_error, error_3d)
-
-    fig = plt.figure(figsize=(14, 10))
-
-    ax1 = fig.add_subplot(2, 2, 1, projection="3d")
-    ax1.plot(
-        gt_cropped[:, 1],
-        gt_cropped[:, 2],
-        gt_cropped[:, 3],
-        "--",
-        label="Ground Truth",
-        color="red",
+    ground_truth = (
+        load_ground_truth(args.ground_truth, args.ground_truth_frame)
+        if args.ground_truth else None
     )
+
+    matched_optimized = poses_optimized
+    if ground_truth is not None:
+        gt_cropped, opt_cropped = crop_to_common_time(ground_truth, poses_optimized)
+        matched_indices = nearest_time_indices(gt_cropped[:, 0], opt_cropped[:, 0])
+        matched_optimized = opt_cropped[matched_indices]
+        xyz_error, error_3d = compute_error_metrics(gt_cropped[:, 1:4], matched_optimized[:, 1:4])
+        print_metrics(xyz_error, error_3d)
+
+    fig = plt.figure(figsize=(14, 10) if ground_truth is not None else (14, 6))
+    rows = 2 if ground_truth is not None else 1
+    ax1 = fig.add_subplot(rows, 2, 1, projection="3d")
+    if ground_truth is not None:
+        ax1.plot(
+            gt_cropped[:, 1],
+            gt_cropped[:, 2],
+            gt_cropped[:, 3],
+            "--",
+            label="Ground Truth",
+            color="red",
+        )
     ax1.plot(
         matched_optimized[:, 1],
         matched_optimized[:, 2],
@@ -162,7 +176,9 @@ def main() -> None:
         color="blue",
     )
     if poses_original is not None:
-        original_cropped, _ = crop_to_common_time(poses_original, ground_truth)
+        original_cropped = poses_original
+        if ground_truth is not None:
+            original_cropped, _ = crop_to_common_time(poses_original, ground_truth)
         ax1.plot(
             original_cropped[:, 1],
             original_cropped[:, 2],
@@ -177,31 +193,35 @@ def main() -> None:
     ax1.set_zlabel("Down (m)")
     ax1.legend()
 
-    ax2 = fig.add_subplot(2, 2, 2)
-    ax2.plot(gt_cropped[:, 0], xyz_error[:, 0], label="North error")
-    ax2.plot(gt_cropped[:, 0], xyz_error[:, 1], label="East error")
-    ax2.plot(gt_cropped[:, 0], xyz_error[:, 2], label="Down error")
-    ax2.set_title("Axis-wise Error in NED")
-    ax2.set_xlabel("Timestamp")
-    ax2.set_ylabel("Error (m)")
-    ax2.grid(True)
-    ax2.legend()
+    if ground_truth is not None:
+        ax2 = fig.add_subplot(2, 2, 2)
+        ax2.plot(gt_cropped[:, 0], xyz_error[:, 0], label="North error")
+        ax2.plot(gt_cropped[:, 0], xyz_error[:, 1], label="East error")
+        ax2.plot(gt_cropped[:, 0], xyz_error[:, 2], label="Down error")
+        ax2.set_title("Axis-wise Error in NED")
+        ax2.set_xlabel("Timestamp")
+        ax2.set_ylabel("Error (m)")
+        ax2.grid(True)
+        ax2.legend()
 
-    ax3 = fig.add_subplot(2, 2, 3)
-    ax3.plot(gt_cropped[:, 0], error_3d, color="black")
-    ax3.set_title("3D Position Error")
-    ax3.set_xlabel("Timestamp")
-    ax3.set_ylabel("Distance (m)")
-    ax3.grid(True)
+        ax3 = fig.add_subplot(2, 2, 3)
+        ax3.plot(gt_cropped[:, 0], error_3d, color="black")
+        ax3.set_title("3D Position Error")
+        ax3.set_xlabel("Timestamp")
+        ax3.set_ylabel("Distance (m)")
+        ax3.grid(True)
 
-    ax4 = fig.add_subplot(2, 2, 4)
-    ax4.plot(gt_cropped[:, 0], gt_cropped[:, 1], "--", label="GT North")
-    ax4.plot(gt_cropped[:, 0], gt_cropped[:, 2], "--", label="GT East")
-    ax4.plot(gt_cropped[:, 0], gt_cropped[:, 3], "--", label="GT Down")
-    ax4.plot(gt_cropped[:, 0], matched_optimized[:, 1], label="OPT North")
-    ax4.plot(gt_cropped[:, 0], matched_optimized[:, 2], label="OPT East")
-    ax4.plot(gt_cropped[:, 0], matched_optimized[:, 3], label="OPT Down")
-    ax4.set_title("Aligned Position Components")
+    ax4 = fig.add_subplot(rows, 2, rows * 2)
+    for column, component, color in ((1, "North", "C0"), (2, "East", "C1"), (3, "Down", "C2")):
+        if ground_truth is not None:
+            ax4.plot(gt_cropped[:, 0], gt_cropped[:, column], "--",
+                     color=color, label=f"GT {component}")
+        if poses_original is not None:
+            ax4.plot(original_cropped[:, 0], original_cropped[:, column], ":",
+                     color=color, label=f"Initial {component}")
+        ax4.plot(matched_optimized[:, 0], matched_optimized[:, column],
+                 color=color, label=f"OPT {component}")
+    ax4.set_title("Aligned Position Components" if ground_truth is not None else "Position Components")
     ax4.set_xlabel("Timestamp")
     ax4.set_ylabel("Position (m)")
     ax4.grid(True)
@@ -209,11 +229,17 @@ def main() -> None:
 
     plt.tight_layout()
 
-    if args.save:
-        plt.savefig(args.save, dpi=200, bbox_inches="tight")
-        print(f"figure saved to: {args.save}")
+    output_file = Path(args.optimized_poses)
+    save_path = Path(args.save) if args.save else output_file.with_name(
+        f"{output_file.stem}_results_3d.png"
+    )
+    save_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(save_path, dpi=200, bbox_inches="tight")
+    print(f"figure saved to: {save_path}")
 
-    plt.show()
+    if args.show:
+        plt.show()
+    plt.close(fig)
 
 
 if __name__ == "__main__":
