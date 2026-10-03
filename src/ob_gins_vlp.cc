@@ -51,7 +51,7 @@ int isNeedInterpolation(const IMU &imu0, const IMU &imu1, double mid);
 void imuInterpolation(const IMU &imu01, IMU &imu00, IMU &imu11, double mid);
 
 void writeNavResult(double time, const IntegrationState &state, FileSaver &navfile,
-                    FileSaver &errfile);
+                    FileSaver &errfile, bool output_pd_position, const Vector3d &pd_lever);
 
 int main(int argc, char *argv[]) {
 
@@ -134,6 +134,18 @@ int main(int argc, char *argv[]) {
     std::string vlppath   = config["vlpfile"].as<std::string>();
     std::string imupath    = config["imufile"].as<std::string>();
     std::string outputpath = config["outputpath"].as<std::string>();
+    bool output_pd_position = false;
+    try {
+        const std::string output_position = config["output_position"].as<std::string>("imu");
+        if (output_position != "imu" && output_position != "pd") {
+            std::cerr << "Invalid output_position: expected imu or pd" << std::endl;
+            return -1;
+        }
+        output_pd_position = output_position == "pd";
+    } catch (const YAML::Exception &error) {
+        std::cerr << "Invalid output_position: " << error.what() << std::endl;
+        return -1;
+    }
     int imudatarate        = config["imudatarate"].as<int>();
 
     // integration scheme
@@ -323,7 +335,7 @@ int main(int argc, char *argv[]) {
         imu_pre = imu_cur;
         imu_cur = imufile.next(parameters->gravity);
         state_curr  = preintegrationlist.back()->currentState();
-        writeNavResult(imu_cur.time-starttime, state_curr, navfile, errfile);
+        writeNavResult(imu_cur.time-starttime, state_curr, navfile, errfile, output_pd_position, antlever);
     }
 
     while (true) {
@@ -545,7 +557,7 @@ int main(int argc, char *argv[]) {
             }
 
             // write result
-            writeNavResult(*timelist.rbegin(), state_curr, navfile, errfile);
+            writeNavResult(*timelist.rbegin(), state_curr, navfile, errfile, output_pd_position, antlever);
 
             // 新建立新的预积分
             // build a new preintegration object
@@ -553,7 +565,8 @@ int main(int argc, char *argv[]) {
                 Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options, vlp_1));
         } else {
             auto integration = *preintegrationlist.rbegin();
-            writeNavResult(integration->endTime(), integration->currentState(), navfile, errfile);
+            writeNavResult(integration->endTime(), integration->currentState(), navfile, errfile,
+                           output_pd_position, antlever);
         }
     }
 
@@ -569,7 +582,7 @@ int main(int argc, char *argv[]) {
 }
 
 void writeNavResult(double time, const IntegrationState &state, FileSaver &navfile,
-                    FileSaver &errfile) {
+                    FileSaver &errfile, bool output_pd_position, const Vector3d &pd_lever) {
     static int counts = 0;
     if ((counts++ % 10) != 0) {
         return;
@@ -578,6 +591,10 @@ void writeNavResult(double time, const IntegrationState &state, FileSaver &navfi
     vector<double> result;
 
     Vector3d pos = state.p;
+    // Change the exported position point only; the navigation state remains at the IMU.
+    if (output_pd_position) {
+        pos += state.q.toRotationMatrix() * pd_lever;
+    }
     Vector3d att = Rotation::quaternion2euler(state.q) * R2D;
     Vector3d vel = state.v;
     Vector3d bg  = state.bg * R2D * 3600;
