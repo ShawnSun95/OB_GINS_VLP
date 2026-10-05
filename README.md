@@ -100,6 +100,32 @@ There is no automatic frame detection or fitted trajectory alignment.
 The frame options above describe `plot_results.py`; `plot_results_3d.py` has its
 own frame options (see its `--help`).
 
+Convert a TUM trajectory to ground-truth data:
+
+```shell
+python3 script/convert_tum_ground_truth.py \
+  --input dataset/20261004_172418_6v31v_xy/trajectory.tum \
+  --output dataset/20261004_172418_6v31v_xy/ground_truth_ned.txt \
+  --xyz 6.3 2.25 1.01 \
+  --rpy 0 0 0 \
+  --rate 10
+```
+
+- `--input`: Required TUM file, columns `t x y z qx qy qz qw` (seconds, metres).
+- `--output`: Required output file, columns `t N E D roll pitch yaw`
+  (seconds, NED metres, ENU degrees).
+- `--xyz E N U`: First input pose's ENU position in metres; default `6.3 2.25 1.01`.
+- `--rpy R P Y`: First input pose's ENU angles in degrees, using
+  `Rz(yaw) * Ry(pitch) * Rx(roll)`; default `0 0 0`.
+- `--rate`: Output frequency in Hz; default `10`, aligned to `.00`, `.10`, `.20`, etc.
+  Use `0` to keep original timestamps.
+- `--reference-nav`: Sample at overlapping nav timestamps instead of `--rate`.
+- `--time-origin`: Seconds subtracted from input timestamps; default `0`.
+- `--time-offset`: Seconds added after subtraction; default `0`.
+
+The first TUM pose is aligned to `--xyz` and `--rpy`. Positions use linear
+interpolation; orientations use quaternion SLERP. Sampling stays within the input time range.
+
 Or for simulation data, we write some scripts:
 ```shell
 ./script/run_simu.sh
