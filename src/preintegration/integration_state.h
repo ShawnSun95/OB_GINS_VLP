@@ -75,6 +75,7 @@ typedef struct imu_vlp{
     int windows;
     double start_time;
     int hz;
+    Vector3d pd_lever{0, 0, 0}; // IMU -> PD in the integration body frame, m
 } imu_vlp;
 
 #endif // INTEGRATION_DEFINE_H

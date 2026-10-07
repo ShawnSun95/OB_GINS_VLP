@@ -7,3 +7,4 @@ config/
 dataset/
 tests/
 *.sh
+output/

@@ -66,13 +66,20 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
     double ti=current_state_.time-vlp_->start_time;
     double tk=floor(ti)+T/2.0;
 
+    const Matrix3d R = current_state_.q.toRotationMatrix();
+    const Vector3d p_pd = current_state_.p + R * vlp_->pd_lever;
+    // v_PD = v_IMU + R * (omega_body x lever). Work in increments so
+    // the bias-compensated/coning-corrected dtheta is used consistently.
+    // Keep the existing nominal sampling interval for the translation term.
+    const Vector3d dp_pd = current_state_.v / hz + R * dtheta.cross(vlp_->pd_lever);
+
     for (int i = 0; i < Nled; i++){ 
     //计算每一时刻改正量
         Vector3d unit(0, 0, -1);
-        Vector3d n_PD = current_state_.q.toRotationMatrix() * unit;
+        Vector3d n_PD = R * unit;
         Vector3d n_LED{0, 0, -1};
         
-        Vector3d D{LED[i*3+1]-current_state_.p(0),LED[i*3+0]-current_state_.p(1),-LED[i*3+2]-current_state_.p(2)};
+        Vector3d D{LED[i*3+1]-p_pd(0),LED[i*3+0]-p_pd(1),-LED[i*3+2]-p_pd(2)};
         
         // Vector3d coef1=-D.cross(n_PD)/D.dot(n_PD);
         // Vector3d coef2 = (-n_PD / n_PD.dot(D)).eval()
@@ -90,12 +97,12 @@ void PreintegrationBase::integration(const IMU &imu_pre, const IMU &imu_cur) {
         //判断时刻
         if(ti>=floor(ti) && ti<tk){
             dp1=(tk-ti)*coef3.dot(current_state_.q.toRotationMatrix() * dtheta)/T;
-            dp1=dp1+(tk-ti)*coef4.dot(current_state_.v)/hz/T;
+            dp1=dp1+(tk-ti)*coef4.dot(dp_pd)/T;
             dRSS_first[i]+=dp1;
         } else {
             //时间段的后半段
             dp2=-(ti-tk)*coef3.dot(current_state_.q.toRotationMatrix() * dtheta)/T;
-            dp2=dp2-(ti-tk)*coef4.dot(current_state_.v)/hz/T;
+            dp2=dp2-(ti-tk)*coef4.dot(dp_pd)/T;
             dRSS_latter[i]+=dp2;
         }
     }

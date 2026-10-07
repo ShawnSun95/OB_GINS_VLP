@@ -310,6 +310,7 @@ int main(int argc, char *argv[]) {
     vlp_1->A=vlp_power;
     vlp_1->M=M;
     vlp_1->hz=imudatarate;
+    vlp_1->pd_lever=antlever;
 
     preintegrationlist.emplace_back(
         Preintegration::createPreintegration(parameters, imu_pre, state_curr, preintegration_options,vlp_1));
