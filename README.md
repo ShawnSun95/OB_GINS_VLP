@@ -6,17 +6,36 @@ OB_GINS_VLP is derived from [OB_GINS](https://github.com/i2Nav-WHU/OB_GINS), com
 
 Loosely coupled and tightly coupled integration are both realized. We recommend you to use visual studio code on linux to run our program. We have provided the configuration files in `.vscode/`.
 
+## 0 Highlights
+
+IMU-aided RSS correction compensates for translation and rotation during the
+DFT window before VLP/INS fusion. Both loosely and tightly coupled navigation
+are supported. Enable correction with `vlp_corr: true`.
+
+<summary>Full trajectory and attitude comparisons (R3 and A2)</summary>
+
+The three columns compare the fixed-map reference, uncorrected navigation,
+and corrected navigation. The upper row shows 3D trajectories; the lower row
+shows rotating body axes and roll/pitch/yaw.
+
+**Running experiment (R3)**
+
+![Running trajectory and attitude with and without RSS correction](docs/rss_correction/running.gif)
+
+**Attitude experiment (A2)**
+
+![Attitude variation with and without RSS correction](docs/rss_correction/attitude.gif)
+
 ## 1 Prerequisites
 
 ### 1.1 System and compiler
 
-We recommend you use Ubuntu 18.04 or Ubuntu 20.04 with the newest compiler (gcc>=8.0).
+Use Linux with GCC/G++ 8 or newer and CMake 3.12 or newer. On Ubuntu/Debian,
+install the standard build tools:
 
 ```shell
-# Ubuntu 18.04 or 20.04
-
-# gcc-8
-sudo apt install gcc-8 g++-8
+sudo apt update
+sudo apt install build-essential cmake
 ```
 
 ### 1.2 GTest (needed for new version of abseil-cpp)
@@ -100,6 +119,8 @@ There is no automatic frame detection or fitted trajectory alignment.
 The frame options above describe `plot_results.py`; `plot_results_3d.py` has its
 own frame options (see its `--help`).
 
+### Reference trajectory conversion
+
 Convert a TUM trajectory to ground-truth data:
 
 ```shell
@@ -125,6 +146,11 @@ python3 script/convert_tum_ground_truth.py \
 
 The first TUM pose is aligned to `--xyz` and `--rpy`. Positions use linear
 interpolation; orientations use quaternion SLERP. Sampling stays within the input time range.
+
+| RSS-corrected VLP/INS | FAST-LIO reference |
+| :---: | :---: |
+| <img src="docs/R3_trajectory.gif" alt="RSS-corrected R3 running trajectory" width="440"> | <img src="docs/FAST-LIO_reference.png" alt="FAST-LIO reference trajectory in the point-cloud map" width="440"> |
+
 
 Or for simulation data, we write some scripts:
 ```shell
